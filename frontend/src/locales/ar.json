@@ -1,0 +1,99 @@
+{
+  "common": {
+    "loading": "جاري التحميل...",
+    "language": "اللغة",
+    "theme": "المظهر",
+    "themeLight": "فاتح",
+    "themeDark": "داكن",
+    "more": "المزيد",
+    "credits": "الرصيد",
+    "cr": "رصيد"
+  },
+  "errors": {
+    "apiUnreachable": "تعذّر الاتصال بالخادم. شغّل npm start من مجلد المشروع وتأكد أن MongoDB يعمل (MONGODB_URI في .env)."
+  },
+  "nav": {
+    "dashboard": "لوحة القيادة",
+    "compose": "إنشاء رسالة",
+    "extract": "استخراج البيانات",
+    "leads": "العملاء المحتملين",
+    "campaigns": "حملات التسويق",
+    "inbox": "الوارد",
+    "sessions": "أرقام واتساب",
+    "wallet": "المحفظة",
+    "settings": "الإعدادات",
+    "admin": "المسؤول",
+    "activity": "النشاط"
+  },
+  "layout": {
+    "closeMenu": "إغلاق القائمة",
+    "openMenu": "فتح القائمة",
+    "signOut": "تسجيل الخروج",
+    "sendingCampaign": "حملة",
+    "sendingMessages": "جاري الإرسال",
+    "sent": "مُرسل",
+    "failed": "فشل",
+    "extractingFound": "تم استخراج... {{n}}",
+    "savingLeads": "جاري الحفظ... {{saved}}/{{total}}",
+    "runsInBackground": "تعمل العمليات في الخلفية — يمكنك التنقل بحرية"
+  },
+  "dashboard": {
+    "greeting": "صباح الخير، {{name}}",
+    "greetingAfternoon": "مساء الخير، {{name}}",
+    "greetingEvening": "مساء الخير، {{name}}",
+    "subtitle": "إليك ملخص نشاطك التسويقي",
+    "creditsLeft": "الرصيد المتبقي",
+    "totalLeads": "إجمالي العملاء",
+    "waVerified": "أرقام موثوقة",
+    "replyRate": "معدل الرد",
+    "messagePerformance": "أداء الرسائل",
+    "noCampaignData": "لا توجد بيانات للحملات حتى الآن.",
+    "launchFirst": "أطلق أول حملة",
+    "quickActions": "إجراءات سريعة",
+    "extractZone": "استخراج مناطق جديدة",
+    "newCampaign": "حملة جديدة",
+    "addSession": "ربط واتساب",
+    "topUp": "شحن الرصيد",
+    "plan": "الباقة",
+    "chartSent": "مُرسلة",
+    "chartDelivered": "مُستلمة",
+    "chartRead": "مقروءة",
+    "chartReplied": "مُجاب عليها",
+    "chartFailed": "فشل"
+  },
+  "login": {
+    "title": "تسجيل الدخول",
+    "subtitle": "مرحباً بك في WhispFlow",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "submit": "دخول",
+    "noAccount": "ليس لديك حساب؟",
+    "register": "إنشاء حساب",
+    "failed": "فشل تسجيل الدخول"
+  },
+  "register": {
+    "subtitle": "أنشئ حسابك",
+    "selectPlan": "اختر الباقة",
+    "fullName": "الاسم الكامل",
+    "company": "الشركة (اختياري)",
+    "passwordPlaceholder": "6 أحرف على الأقل",
+    "submit": "إنشاء الحساب",
+    "submitLoading": "جاري إنشاء الحساب…",
+    "haveAccount": "لديك حساب بالفعل؟",
+    "signIn": "تسجيل الدخول",
+    "success": "تم إنشاء الحساب! مرحباً بك في WhispFlow.",
+    "failed": "فشل التسجيل",
+    "nameRequired": "الاسم مطلوب",
+    "emailRequired": "البريد مطلوب",
+    "passwordRequired": "كلمة المرور مطلوبة",
+    "passwordMin": "6 أحرف على الأقل",
+    "plans": {
+      "free": "مجاني",
+      "starter": "ستارتر",
+      "pro": "برو",
+      "agency": "وكالة",
+      "freePrice": "مجاني",
+      "perMonth": "{{price}} د.ت/شهر"
+    }
+  }
+}

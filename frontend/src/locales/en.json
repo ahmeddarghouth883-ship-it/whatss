@@ -1,0 +1,99 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "more": "More",
+    "credits": "credits",
+    "cr": "cr"
+  },
+  "errors": {
+    "apiUnreachable": "Cannot reach the server. Run npm start in the project folder and ensure MongoDB is running (see .env MONGODB_URI)."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "compose": "Compose",
+    "extract": "Extract",
+    "leads": "Leads",
+    "campaigns": "Campaigns",
+    "inbox": "Inbox",
+    "sessions": "WA Sessions",
+    "wallet": "Wallet",
+    "settings": "Settings",
+    "admin": "Admin",
+    "activity": "Activity"
+  },
+  "layout": {
+    "closeMenu": "Close menu",
+    "openMenu": "Open menu",
+    "signOut": "Sign out",
+    "sendingCampaign": "Campaign",
+    "sendingMessages": "Sending messages",
+    "sent": "sent",
+    "failed": "failed",
+    "extractingFound": "Extracting… {{n}} found",
+    "savingLeads": "Saving… {{saved}}/{{total}}",
+    "runsInBackground": "Runs in background — safe to navigate"
+  },
+  "dashboard": {
+    "greeting": "Good morning, {{name}}",
+    "greetingAfternoon": "Good afternoon, {{name}}",
+    "greetingEvening": "Good evening, {{name}}",
+    "subtitle": "Here's what's happening with your outreach",
+    "creditsLeft": "Credits left",
+    "totalLeads": "Total leads",
+    "waVerified": "WA verified",
+    "replyRate": "Reply rate",
+    "messagePerformance": "Message performance",
+    "noCampaignData": "No campaign data yet.",
+    "launchFirst": "Launch first campaign",
+    "quickActions": "Quick actions",
+    "extractZone": "Extract new zone",
+    "newCampaign": "New campaign",
+    "addSession": "Add WA session",
+    "topUp": "Top up credits",
+    "plan": "Plan",
+    "chartSent": "Sent",
+    "chartDelivered": "Delivered",
+    "chartRead": "Read",
+    "chartReplied": "Replied",
+    "chartFailed": "Failed"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Welcome back to WhispFlow",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "noAccount": "Don't have an account?",
+    "register": "Create one",
+    "failed": "Sign in failed"
+  },
+  "register": {
+    "subtitle": "Create your account",
+    "selectPlan": "Select plan",
+    "fullName": "Full name",
+    "company": "Company (optional)",
+    "passwordPlaceholder": "At least 6 characters",
+    "submit": "Create account",
+    "submitLoading": "Creating account…",
+    "haveAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "success": "Account created! Welcome to WhispFlow.",
+    "failed": "Registration failed",
+    "nameRequired": "Name required",
+    "emailRequired": "Email required",
+    "passwordRequired": "Password required",
+    "passwordMin": "Min 6 characters",
+    "plans": {
+      "free": "Free",
+      "starter": "Starter",
+      "pro": "Pro",
+      "agency": "Agency",
+      "freePrice": "Free",
+      "perMonth": "{{price}} TND/mo"
+    }
+  }
+}

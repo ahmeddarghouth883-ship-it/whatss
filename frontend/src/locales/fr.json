@@ -1,0 +1,99 @@
+{
+  "common": {
+    "loading": "Chargement…",
+    "language": "Langue",
+    "theme": "Thème",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "more": "Plus",
+    "credits": "crédits",
+    "cr": "cr"
+  },
+  "errors": {
+    "apiUnreachable": "Impossible de joindre le serveur. Lancez npm start à la racine du projet et vérifiez que MongoDB tourne (MONGODB_URI dans .env)."
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "compose": "Composer",
+    "extract": "Extraction",
+    "leads": "Prospects",
+    "campaigns": "Campagnes",
+    "inbox": "Boîte de réception",
+    "sessions": "Sessions WA",
+    "wallet": "Portefeuille",
+    "settings": "Paramètres",
+    "admin": "Admin",
+    "activity": "Activité"
+  },
+  "layout": {
+    "closeMenu": "Fermer le menu",
+    "openMenu": "Ouvrir le menu",
+    "signOut": "Déconnexion",
+    "sendingCampaign": "Campagne",
+    "sendingMessages": "Envoi des messages",
+    "sent": "envoyés",
+    "failed": "échoués",
+    "extractingFound": "Extraction… {{n}} trouvés",
+    "savingLeads": "Enregistrement… {{saved}}/{{total}}",
+    "runsInBackground": "Continue en arrière-plan — navigation sûre"
+  },
+  "dashboard": {
+    "greeting": "Bonjour, {{name}}",
+    "greetingAfternoon": "Bon après-midi, {{name}}",
+    "greetingEvening": "Bonsoir, {{name}}",
+    "subtitle": "Voici l état de votre prospection",
+    "creditsLeft": "Crédits restants",
+    "totalLeads": "Prospects totaux",
+    "waVerified": "WA vérifiés",
+    "replyRate": "Taux de réponse",
+    "messagePerformance": "Performance des messages",
+    "noCampaignData": "Pas encore de données de campagne.",
+    "launchFirst": "Lancer une première campagne",
+    "quickActions": "Actions rapides",
+    "extractZone": "Extraire une zone",
+    "newCampaign": "Nouvelle campagne",
+    "addSession": "Ajouter une session WA",
+    "topUp": "Recharger les crédits",
+    "plan": "Offre",
+    "chartSent": "Envoyés",
+    "chartDelivered": "Livrés",
+    "chartRead": "Lus",
+    "chartReplied": "Réponses",
+    "chartFailed": "Échecs"
+  },
+  "login": {
+    "title": "Connexion",
+    "subtitle": "Bienvenue sur WhispFlow",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "noAccount": "Pas de compte ?",
+    "register": "Créer un compte",
+    "failed": "Échec de la connexion"
+  },
+  "register": {
+    "subtitle": "Créez votre compte",
+    "selectPlan": "Choisir une offre",
+    "fullName": "Nom complet",
+    "company": "Entreprise (optionnel)",
+    "passwordPlaceholder": "Au moins 6 caractères",
+    "submit": "Créer le compte",
+    "submitLoading": "Création du compte…",
+    "haveAccount": "Déjà un compte ?",
+    "signIn": "Se connecter",
+    "success": "Compte créé ! Bienvenue sur WhispFlow.",
+    "failed": "Échec de l'inscription",
+    "nameRequired": "Nom requis",
+    "emailRequired": "E-mail requis",
+    "passwordRequired": "Mot de passe requis",
+    "passwordMin": "6 caractères minimum",
+    "plans": {
+      "free": "Gratuit",
+      "starter": "Starter",
+      "pro": "Pro",
+      "agency": "Agence",
+      "freePrice": "Gratuit",
+      "perMonth": "{{price}} TND/mois"
+    }
+  }
+}

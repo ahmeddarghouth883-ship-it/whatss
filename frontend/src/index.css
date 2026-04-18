@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+  }
+  h1, h2, h3 { @apply font-serif; }
+  html[dir="rtl"] h1,
+  html[dir="rtl"] h2,
+  html[dir="rtl"] h3 {
+    @apply font-sans;
+  }
+  /* Prevent double-tap zoom on buttons/inputs on iOS */
+  button, input, select, textarea { touch-action: manipulation; }
+}
+
+@layer utilities {
+  /* Safe area padding for bottom nav on notched phones */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Smooth scrolling on iOS */
+  .scroll-ios {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-green-600 text-white hover:bg-green-700 active:scale-95 shadow-sm hover:shadow-md;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 active:scale-95;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 active:scale-95;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
+  }
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all;
+  }
+  .label {
+    @apply block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-green  { @apply badge bg-green-100 text-green-800; }
+  .badge-gray   { @apply badge bg-gray-100 text-gray-700; }
+  .badge-yellow { @apply badge bg-yellow-100 text-yellow-800; }
+  .badge-red    { @apply badge bg-red-100 text-red-700; }
+  .badge-blue   { @apply badge bg-blue-100 text-blue-800; }
+  .stat-card {
+    @apply card p-5 flex flex-col gap-1;
+  }
+  .stat-value {
+    @apply font-serif text-3xl text-gray-900;
+  }
+  .stat-label {
+    @apply text-xs text-gray-500 font-mono uppercase tracking-wide;
+  }
+}
+
+/* Dark mode — app shell */
+.dark body {
+  @apply bg-gray-950 text-gray-100;
+}
+@layer components {
+  .dark .card {
+    @apply bg-gray-900 border-gray-800;
+  }
+  .dark .stat-card {
+    @apply bg-gray-900 border-gray-800;
+  }
+  .dark .stat-value {
+    @apply text-gray-50;
+  }
+  .dark .stat-label {
+    @apply text-gray-400;
+  }
+  .dark .input {
+    @apply bg-gray-900 border-gray-700 text-gray-100 placeholder-gray-500;
+  }
+  .dark .btn-secondary {
+    @apply bg-gray-900 border-gray-700 text-gray-200 hover:bg-gray-800;
+  }
+  .dark .label {
+    @apply text-gray-400;
+  }
+  .dark .badge-green { @apply bg-green-900/40 text-green-300; }
+  .dark .badge-gray { @apply bg-gray-800 text-gray-300; }
+  .dark .badge-yellow { @apply bg-yellow-900/40 text-yellow-200; }
+  .dark .badge-red { @apply bg-red-900/40 text-red-300; }
+  .dark .badge-blue { @apply bg-blue-900/40 text-blue-300; }
+}

@@ -14,6 +14,7 @@ const http    = require('http');
 const path    = require('path');
 const express = require('express');
 const cors    = require('cors');
+const mongoose = require('mongoose');
 const { Server: IOServer } = require('socket.io');
 const jwt     = require('jsonwebtoken');
 
@@ -47,10 +48,19 @@ app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
+  const st = mongoose.connection.readyState;
+  const stateNames = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
   res.json({
     ok: true,
+    mongo: {
+      state: stateNames[st] ?? st,
+      connected: st === 1,
+      db: mongoose.connection.db?.databaseName ?? null,
+    },
+    hasMongoUri: !!(process.env.MONGODB_URI && String(process.env.MONGODB_URI).trim()),
     placesKey: !!process.env.GOOGLE_PLACES_API_KEY,
     time: new Date().toISOString(),
+    nodeEnv: process.env.NODE_ENV || 'development',
   });
 });
 

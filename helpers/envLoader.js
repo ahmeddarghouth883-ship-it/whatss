@@ -5,6 +5,7 @@
  * `env/logs` format example:
  *   Google Place API=AIzaSy...
  *   MONGODB_URI=mongodb://127.0.0.1:27017/whispflow
+ * mongodb+srv://ahmeddarghouthditasli_db_user:7BbNw0n29p7OAyvI@cluster0.t78gscb.mongodb.net/?appName=Cluster0
  *
  * Keys are mapped to canonical env var names:
  *   - Any key containing "google place" -> GOOGLE_PLACES_API_KEY

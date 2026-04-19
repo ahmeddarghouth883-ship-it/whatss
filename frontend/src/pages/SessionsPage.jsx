@@ -23,7 +23,21 @@ export default function SessionsPage() {
   const [newName,   setNewName]   = useState('')
 
   useEffect(() => {
-    api.get('/whatsapp/sessions').then(r => setSessions(r.data.sessions)).finally(() => setLoading(false))
+    api
+      .get('/whatsapp/sessions')
+      .then((r) => {
+        const list = r.data.sessions || []
+        setSessions(list)
+        // QR is also stored server-side — show it even if the socket missed wa:qr (race / refresh).
+        setQrData((prev) => {
+          const next = { ...prev }
+          for (const s of list) {
+            if (s.sessionId && s.qrCode) next[s.sessionId] = s.qrCode
+          }
+          return next
+        })
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
@@ -39,21 +53,63 @@ export default function SessionsPage() {
     const onDisconnected = d => {
       setSessions(prev => prev.map(s => s.sessionId === d.sessionId ? { ...s, status: 'disconnected' } : s))
     }
+    const onError = d => {
+      toast.error(d.message || 'WhatsApp session error')
+      setSessions(prev =>
+        prev.map(s => (s.sessionId === d.sessionId ? { ...s, status: 'disconnected' } : s))
+      )
+    }
     socket.on('wa:qr',           onQR)
     socket.on('wa:ready',        onReady)
     socket.on('wa:disconnected', onDisconnected)
+    socket.on('wa:error',       onError)
     return () => {
       socket.off('wa:qr', onQR)
       socket.off('wa:ready', onReady)
       socket.off('wa:disconnected', onDisconnected)
+      socket.off('wa:error', onError)
     }
   }, [socket])
+
+  // Poll while a session is still pairing — picks up qrCode from Mongo if socket missed wa:qr.
+  useEffect(() => {
+    const needsPoll = sessions.some((s) => s.status === 'connecting' || s.status === 'qr')
+    if (!needsPoll) return undefined
+    const tick = () => {
+      api
+        .get('/whatsapp/sessions')
+        .then((r) => {
+          const list = r.data.sessions || []
+          setSessions(list)
+          setQrData((prev) => {
+            const next = { ...prev }
+            for (const s of list) {
+              if (s.sessionId && s.qrCode) next[s.sessionId] = s.qrCode
+            }
+            return next
+          })
+        })
+        .catch(() => {})
+    }
+    tick()
+    const id = window.setInterval(tick, 2500)
+    return () => window.clearInterval(id)
+  }, [sessions])
 
   async function createSession() {
     setCreating(true)
     try {
       const res = await api.post('/whatsapp/sessions', { name: newName || undefined })
-      setSessions(prev => [{ sessionId: res.data.sessionId, status: 'connecting', name: newName || res.data.sessionId }, ...prev])
+      const created = res.data.session
+      if (!created?.sessionId) {
+        toast.error('Invalid server response — try again.')
+        return
+      }
+      const row = {
+        ...created,
+        name: created.name || newName || created.sessionId,
+      }
+      setSessions((prev) => [row, ...prev.filter((s) => s.sessionId !== row.sessionId)])
       setNewName('')
       toast.success('Session starting — scan QR when it appears')
     } catch (err) {

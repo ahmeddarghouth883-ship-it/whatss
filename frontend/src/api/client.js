@@ -1,11 +1,24 @@
 import axios from 'axios'
 
+/** Build full /api base; supports https://backend.com or https://backend.com/api */
+function apiBaseFromEnv(raw) {
+  const s = String(raw || '').trim().replace(/\/$/, '')
+  if (!s) return ''
+  return s.endsWith('/api') ? s : `${s}/api`
+}
+
 function getApiBaseURL() {
+  const fromEnv = apiBaseFromEnv(import.meta.env.VITE_API_URL)
+  if (fromEnv) return fromEnv
+
   if (typeof window === 'undefined') return '/api'
+
+  // Production (same-origin): Express serves both SPA and /api — leave relative.
   if (!import.meta.env.DEV) return '/api'
-  // In dev, target backend directly to avoid Vite proxy edge-cases.
+
+  // Dev: call backend directly unless VITE_API_URL was set above.
   const host = window.location.hostname || 'localhost'
-  return import.meta.env.VITE_API_URL || `http://${host}:5000/api`
+  return `http://${host}:5000/api`
 }
 
 const api = axios.create({

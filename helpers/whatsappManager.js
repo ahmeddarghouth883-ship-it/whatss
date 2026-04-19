@@ -9,6 +9,16 @@ const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 // In-memory map of active WA clients: sessionId -> Client instance
 const clients = new Map();
 
+function ensureAuthDir(dataPath) {
+  try {
+    if (dataPath && !fs.existsSync(dataPath)) {
+      fs.mkdirSync(dataPath, { recursive: true });
+    }
+  } catch (e) {
+    console.warn('[whatsapp] could not create auth dir:', dataPath, e.message);
+  }
+}
+
 /**
  * Convert user-provided phone to WhatsApp jid digits.
  * Accepts formats like +336..., 00336..., 336..., spaces/dashes.
@@ -29,10 +39,16 @@ function toWaJid(phone) {
 async function createClient(sessionId, userId, io) {
   if (clients.has(sessionId)) return clients.get(sessionId);
 
+  const authRel =
+    process.env.WWEBJS_AUTH_PATH ||
+    (process.env.NODE_ENV === 'production' ? '/app/data/.wwebjs_auth' : './.wwebjs_auth');
+  const authAbs = path.isAbsolute(authRel) ? authRel : path.join(__dirname, '..', authRel);
+  ensureAuthDir(authAbs);
+
   const client = new Client({
-    authStrategy: new LocalAuth({ 
-      clientId: sessionId, 
-      dataPath: process.env.NODE_ENV === 'production' ? '/app/data/.wwebjs_auth' : './.wwebjs_auth' 
+    authStrategy: new LocalAuth({
+      clientId: sessionId,
+      dataPath: authAbs,
     }),
     puppeteer: {
       headless: true,
@@ -41,8 +57,22 @@ async function createClient(sessionId, userId, io) {
   });
 
   const emit = (event, data) => {
-    if (io) io.to(userId).emit(event, { sessionId, ...data });
+    if (!io) return;
+    const payload = { sessionId, ...data };
+    const uid = String(userId);
+    io.to(uid).emit(event, payload);
+    io.to(`user:${uid}`).emit(event, payload);
   };
+
+  client.on('auth_failure', async (msg) => {
+    const message = String(msg || 'WhatsApp authentication failed');
+    emit('wa:error', { message });
+    await WASession.findOneAndUpdate({ sessionId }, { status: 'disconnected', qrCode: null });
+    try {
+      await clients.get(sessionId)?.destroy?.();
+    } catch (_) {}
+    clients.delete(sessionId);
+  });
 
   client.on('qr', async (qr) => {
     const qrDataUrl = await qrcode.toDataURL(qr);
@@ -150,7 +180,21 @@ async function createClient(sessionId, userId, io) {
   });
 
   clients.set(sessionId, client);
-  await client.initialize();
+  try {
+    await client.initialize();
+  } catch (err) {
+    const message = err?.message || String(err);
+    console.error('[whatsapp] initialize failed:', sessionId, message);
+    emit('wa:error', { message: `WhatsApp could not start (${message}). On a server, ensure Chromium/Puppeteer deps and a writable auth folder.` });
+    clients.delete(sessionId);
+    try {
+      await client.destroy?.();
+    } catch (_) {}
+    await WASession.findOneAndUpdate(
+      { sessionId },
+      { status: 'disconnected', qrCode: null }
+    ).catch(() => {});
+  }
   return client;
 }
 

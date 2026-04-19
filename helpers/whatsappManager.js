@@ -20,6 +20,47 @@ function ensureAuthDir(dataPath) {
 }
 
 /**
+ * Puppeteer launch options for whatsapp-web.js.
+ * On Linux servers/Docker, bundled Chrome often fails with missing .so libs — install
+ * Chromium + deps (see Dockerfile) and set PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium.
+ */
+function buildPuppeteerOptions() {
+  const execPath = String(
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.CHROMIUM_PATH ||
+      process.env.CHROME_PATH ||
+      ''
+  ).trim();
+
+  const args = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-software-rasterizer',
+    '--disable-extensions',
+  ];
+
+  const extra = String(process.env.PUPPETEER_EXTRA_ARGS || '').trim();
+  if (extra) {
+    for (const a of extra.split(/\s+/)) {
+      if (a) args.push(a);
+    }
+  }
+
+  const opts = { headless: true, args };
+
+  if (execPath) {
+    if (!fs.existsSync(execPath)) {
+      console.warn(`[whatsapp] PUPPETEER_EXECUTABLE_PATH not found on disk: ${execPath}`);
+    }
+    opts.executablePath = execPath;
+  }
+
+  return opts;
+}
+
+/**
  * Convert user-provided phone to WhatsApp jid digits.
  * Accepts formats like +336..., 00336..., 336..., spaces/dashes.
  */
@@ -50,10 +91,7 @@ async function createClient(sessionId, userId, io) {
       clientId: sessionId,
       dataPath: authAbs,
     }),
-    puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    }
+    puppeteer: buildPuppeteerOptions()
   });
 
   const emit = (event, data) => {

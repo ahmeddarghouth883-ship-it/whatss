@@ -149,7 +149,7 @@ export default function CampaignDetail() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Phone', 'Status', 'Sent at', 'Read at', 'Replied at'].map(h => (
+                  {['Phone', 'Status', 'Reason (if failed)', 'Sent at', 'Read at', 'Replied at'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -166,6 +166,13 @@ export default function CampaignDetail() {
                         m.status === 'sent'      ? 'badge-gray'  : 'badge-red'
                       }`}>{m.status}</span>
                     </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 max-w-[240px]">
+                      {m.status === 'failed' && m.failReason ? (
+                        <span className="break-words line-clamp-3" title={m.failReason}>{m.failReason}</span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{m.sentAt ? new Date(m.sentAt).toLocaleTimeString() : '—'}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{m.readAt ? new Date(m.readAt).toLocaleTimeString() : '—'}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{m.repliedAt ? new Date(m.repliedAt).toLocaleTimeString() : '—'}</td>
@@ -178,14 +185,19 @@ export default function CampaignDetail() {
           {/* Mobile message cards */}
           <div className="sm:hidden divide-y divide-gray-50">
             {messages.slice(0, 100).map(m => (
-              <div key={m._id} className="px-4 py-3 flex items-center justify-between gap-3">
-                <span className="font-mono text-xs text-gray-700">{m.phone}</span>
-                <span className={`badge text-xs flex-shrink-0 ${
-                  m.status === 'replied'   ? 'badge-green' :
-                  m.status === 'read'      ? 'bg-purple-100 text-purple-800' :
-                  m.status === 'delivered' ? 'badge-blue'  :
-                  m.status === 'sent'      ? 'badge-gray'  : 'badge-red'
-                }`}>{m.status}</span>
+              <div key={m._id} className="px-4 py-3 space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono text-xs text-gray-700">{m.phone}</span>
+                  <span className={`badge text-xs flex-shrink-0 ${
+                    m.status === 'replied'   ? 'badge-green' :
+                    m.status === 'read'      ? 'bg-purple-100 text-purple-800' :
+                    m.status === 'delivered' ? 'badge-blue'  :
+                    m.status === 'sent'      ? 'badge-gray'  : 'badge-red'
+                  }`}>{m.status}</span>
+                </div>
+                {m.status === 'failed' && m.failReason && (
+                  <p className="text-[11px] text-red-700/90 break-words">{m.failReason}</p>
+                )}
               </div>
             ))}
           </div>

@@ -61,16 +61,27 @@ function buildPuppeteerOptions() {
   return opts;
 }
 
+/** E.164 max length — valid for every country WhatsApp serves; we do not filter by region. */
+const MAX_E164_DIGITS = 15;
+
 /**
  * Convert user-provided phone to WhatsApp jid digits.
- * Accepts formats like +336..., 00336..., 336..., spaces/dashes.
+ * Worldwide numbers: any valid international dial (country code + national number).
+ * Accepts +336…, 00336…, 336…, spaces/dashes; rejects too-short or >15-digit strings.
  */
 function toWaJid(phone) {
   if (!phone) throw new Error('Phone number is required');
   let normalized = String(phone).trim();
   if (normalized.startsWith('00')) normalized = `+${normalized.slice(2)}`;
   const digits = normalized.replace(/\D/g, '');
-  if (digits.length < 7) throw new Error(`Invalid phone number: ${phone}`);
+  if (digits.length < 7) {
+    throw new Error(`Invalid phone number (too short — include country code): ${phone}`);
+  }
+  if (digits.length > MAX_E164_DIGITS) {
+    throw new Error(
+      `Invalid phone number (max ${MAX_E164_DIGITS} digits, international format): ${phone}`
+    );
+  }
   return `${digits}@c.us`;
 }
 

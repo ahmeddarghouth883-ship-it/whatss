@@ -6,11 +6,16 @@ import MultiFileUploader from '../components/MultiFileUploader'
 import { useSocket } from '../hooks/useSocket'
 
 // ── Parse a raw string into an array of phone numbers ─────────────────────
+/** International (E.164-style): 7–15 digits after stripping formatting — all countries supported. */
+function digitCount(p) {
+  return String(p || '').replace(/\D/g, '').length
+}
+
 function parsePhones(raw) {
   return raw
     .split(/[\s,;\n]+/)
     .map(p => p.replace(/[^\d+]/g, ''))
-    .filter(p => p.length >= 7)
+    .filter(p => digitCount(p) >= 7 && digitCount(p) <= 15)
 }
 
 // ── Phone chip input ───────────────────────────────────────────────────────
@@ -69,7 +74,7 @@ function PhoneInput({ phones, setPhones }) {
         onKeyDown={onKeyDown}
         onBlur={commit}
         onPaste={onPaste}
-        placeholder={phones.length ? 'Add more…' : 'Type or paste numbers… +33612345678, +21698765432, …'}
+        placeholder={phones.length ? 'Add more…' : 'Paste numbers worldwide… +212…, +1…, +44…, +971…'}
         className="flex-1 min-w-[200px] outline-none text-sm bg-transparent placeholder-gray-300 py-1 px-1"
       />
     </div>
@@ -270,7 +275,9 @@ export default function ComposePage() {
           <PhoneInput phones={phones} setPhones={setPhones} />
           <p className="text-xs text-gray-400 mt-1.5">
             Paste any numbers — separate by comma, space or new line.
-            Include country code (e.g. <code className="bg-gray-100 px-1 rounded">+21698765432</code>).
+            Worldwide — include country code, no leading 0 (e.g.{' '}
+            <code className="bg-gray-100 px-1 rounded">+212612345678</code>,{' '}
+            <code className="bg-gray-100 px-1 rounded">+33612345678</code>). Max 15 digits total.
           </p>
         </div>
 

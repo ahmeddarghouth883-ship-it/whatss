@@ -27,6 +27,21 @@ function personalize(template, lead) {
     .replace(/\{\{category\}\}/gi, lead.category || '');
 }
 
+/** Collect lead id strings from various client shapes (array, comma-string, legacy object). */
+function normalizeLeadIdList(raw) {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((id) => String(id || '').trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    return raw.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+  }
+  if (typeof raw === 'object') {
+    return Object.values(raw).map((id) => String(id || '').trim()).filter(Boolean);
+  }
+  return [];
+}
+
 function roomForUser(userId) {
   return `user:${String(userId)}`;
 }
@@ -178,23 +193,19 @@ router.post('/', authenticate, async (req, res) => {
 
     let leadIds;
 
-    const hasExplicitLeadIds = Array.isArray(req.body?.leadIds);
-    if (hasExplicitLeadIds) {
-      if (req.body.leadIds.length === 0) {
-        return res.status(400).json({
-          error: 'leadIds is empty — select at least one lead, or create the campaign without leadIds to use zone/category filters.',
-        });
-      }
-      const requested = [
-        ...new Set(
-          req.body.leadIds
-            .map((id) => String(id || '').trim())
-            .filter((id) => mongoose.isValidObjectId(id))
-        ),
-      ];
-      if (!requested.length) {
-        return res.status(400).json({ error: 'leadIds must contain valid MongoDB ids' });
-      }
+    const audience = String(req.body?.audience || '').trim().toLowerCase();
+    const wantsLeadSelection =
+      audience === 'selected' || audience === 'selection' || req.body?.fromLeadsSelection === true;
+
+    const mergedRaw = [
+      ...normalizeLeadIdList(req.body?.leadIds),
+      ...normalizeLeadIdList(req.body?.selectedLeadIds),
+      ...normalizeLeadIdList(req.body?.lead_ids),
+    ];
+    const requestedUnique = [...new Set(mergedRaw)].filter((id) => mongoose.isValidObjectId(id));
+
+    async function resolveExplicitLeadIds(requested) {
+      if (!requested.length) return [];
       const oidList = requested.map((id) => new mongoose.Types.ObjectId(id));
       const found = await Lead.find({
         userId: req.userId,
@@ -203,7 +214,22 @@ router.post('/', authenticate, async (req, res) => {
         .select('_id')
         .lean();
       const allowed = new Set(found.map((l) => String(l._id)));
-      leadIds = requested.filter((id) => allowed.has(id)).map((id) => new mongoose.Types.ObjectId(id));
+      return requested.filter((id) => allowed.has(id)).map((id) => new mongoose.Types.ObjectId(id));
+    }
+
+    if (wantsLeadSelection) {
+      if (!requestedUnique.length) {
+        return res.status(400).json({
+          error:
+            'No valid lead IDs were sent. Select contacts on Leads again and retry (send leadIds / selectedLeadIds).',
+        });
+      }
+      leadIds = await resolveExplicitLeadIds(requestedUnique);
+      if (!leadIds.length) {
+        return res.status(400).json({ error: 'None of the given leads belong to your account' });
+      }
+    } else if (requestedUnique.length > 0) {
+      leadIds = await resolveExplicitLeadIds(requestedUnique);
       if (!leadIds.length) {
         return res.status(400).json({ error: 'None of the given leads belong to your account' });
       }

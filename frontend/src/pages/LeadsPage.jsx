@@ -74,11 +74,14 @@ function QuickSendModal({ leadIds, onClose }) {
     try {
       // Create campaign with the selected lead IDs
       const name = `Quick send – ${new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}`
+      const selectedIds = leadIds.map(id => String(id))
       const { data } = await api.post('/campaigns', {
         name,
         message:   form.message,
         sessionId: form.sessionId,
-        leadIds,
+        audience: 'selected',
+        leadIds: selectedIds,
+        selectedLeadIds: selectedIds,
         mediaUrl:  mediaFile?.url || undefined,
         rateLimit: 20,
       })

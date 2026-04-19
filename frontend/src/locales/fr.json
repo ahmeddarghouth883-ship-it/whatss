@@ -72,7 +72,8 @@
     "failed": "Échec de la connexion"
   },
   "register": {
-    "subtitle": "Créez votre compte",
+    "badge": "C'est parti",
+    "subtitle": "Créez votre compte — les crédits d'essai sont appliqués automatiquement après l'inscription.",
     "selectPlan": "Choisir une offre",
     "fullName": "Nom complet",
     "company": "Entreprise (optionnel)",

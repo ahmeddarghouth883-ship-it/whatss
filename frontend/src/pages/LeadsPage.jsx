@@ -197,6 +197,57 @@ export default function LeadsPage() {
   const [selected,      setSelected]      = useState(new Set())
   const [showSendModal, setShowSendModal] = useState(false)
   const [filters,       setFilters]       = useState({ zone: '', category: '', verified: '', search: '' })
+  const [editingLead,   setEditingLead]   = useState(null)   // _id of inline editor row
+  const [busyId,        setBusyId]        = useState(null)
+  const [waSessions,    setWaSessions]    = useState([])
+
+  useEffect(() => {
+    api.get('/whatsapp/sessions').then(r => setWaSessions(r.data.sessions || [])).catch(() => {})
+  }, [])
+
+  function patchLeadInPlace(id, patch) {
+    setLeads(prev => prev.map(l => l._id === id ? { ...l, ...patch } : l))
+  }
+
+  async function saveTagsNotes(lead, { tags, notes }) {
+    try {
+      const r = await api.patch(`/leads/${lead._id}`, { tags, notes })
+      patchLeadInPlace(lead._id, r.data.lead)
+      toast.success('Saved')
+      setEditingLead(null)
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Save failed')
+    }
+  }
+
+  async function enrichLead(lead) {
+    if (!lead.website) return toast.error('Lead has no website for email extraction')
+    setBusyId(lead._id)
+    try {
+      const r = await api.post(`/leads/${lead._id}/enrich`)
+      patchLeadInPlace(lead._id, r.data.lead)
+      if (r.data.lead?.email) toast.success(`Found email: ${r.data.lead.email}`)
+      else toast(`No email on ${new URL(/^https?:/i.test(lead.website) ? lead.website : `https://${lead.website}`).hostname}`)
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Enrichment failed')
+    } finally { setBusyId(null) }
+  }
+
+  async function verifyWaSelection() {
+    if (selected.size === 0) return
+    const ready = waSessions.find(s => s.status === 'ready')
+    if (!ready) return toast.error('Connect a WhatsApp session first (Sessions page)')
+    try {
+      const r = await api.post('/whatsapp/verify-numbers', {
+        sessionId: ready.sessionId,
+        leadIds: [...selected],
+      })
+      toast.success(`${r.data.verified}/${r.data.checked} are on WhatsApp`)
+      loadLeads()
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Verification failed')
+    }
+  }
 
   const loadLeads = useCallback(async () => {
     setLoading(true)
@@ -273,7 +324,7 @@ export default function LeadsPage() {
           <button onClick={exportCSV} className="btn-secondary flex-1 sm:flex-none justify-center">
             ↓ Export CSV
           </button>
-          <Link to="/scrape" className="btn-primary flex-1 sm:flex-none justify-center">⊕ Scrape more</Link>
+          <Link to="/scrape" className="btn-primary flex-1 sm:flex-none justify-center">⊕ Extract more</Link>
         </div>
       </div>
 
@@ -295,6 +346,13 @@ export default function LeadsPage() {
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-4 text-sm border border-green-300 text-green-700 hover:bg-green-100 rounded-lg transition-colors"
             >
               <CopyIcon /> Copy numbers
+            </button>
+            <button
+              onClick={verifyWaSelection}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-4 text-sm border border-green-300 text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+              title="Check which selected leads have WhatsApp"
+            >
+              ✓ Verify WA
             </button>
             <button
               onClick={deleteSelected}
@@ -407,12 +465,66 @@ export default function LeadsPage() {
                       : <span className="badge-gray text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => deleteLead(lead._id)} className="text-gray-300 hover:text-red-500 text-xs transition-colors">
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditingLead(editingLead === lead._id ? null : lead._id)}
+                        className="text-xs text-gray-400 hover:text-gray-700"
+                        title="Tags & notes"
+                      >
+                        ✎
+                      </button>
+                      {lead.website && (
+                        <button
+                          onClick={() => enrichLead(lead)}
+                          disabled={busyId === lead._id}
+                          className="text-xs text-gray-400 hover:text-blue-600 disabled:opacity-40"
+                          title={lead.email ? `Email: ${lead.email}` : 'Extract email from website'}
+                        >
+                          {busyId === lead._id ? '…' : (lead.email ? '✉' : '↗')}
+                        </button>
+                      )}
+                      <button onClick={() => deleteLead(lead._id)} className="text-xs text-gray-300 hover:text-red-500 transition-colors">
+                        ✕
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {editingLead && (() => {
+                const lead = leads.find(l => l._id === editingLead)
+                if (!lead) return null
+                let tagsRef = (lead.tags || []).join(', ')
+                let notesRef = lead.notes || ''
+                return (
+                  <tr key={`${editingLead}-edit`} className="bg-yellow-50/40 dark:bg-yellow-900/10 border-b border-yellow-100 dark:border-yellow-900">
+                    <td colSpan={8} className="px-4 py-3">
+                      <div className="flex flex-col gap-2 max-w-2xl">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wide">Edit {lead.name}</p>
+                        <input
+                          defaultValue={tagsRef}
+                          onChange={(e) => { tagsRef = e.target.value }}
+                          placeholder="Tags (comma-separated, e.g. vip, follow-up)"
+                          className="input text-xs"
+                        />
+                        <textarea
+                          defaultValue={notesRef}
+                          onChange={(e) => { notesRef = e.target.value }}
+                          placeholder="Notes…"
+                          rows={2}
+                          className="input text-xs"
+                        />
+                        {lead.email && <p className="text-[11px] text-gray-500">Email: <a className="text-blue-600 underline" href={`mailto:${lead.email}`}>{lead.email}</a></p>}
+                        <div className="flex gap-2">
+                          <button onClick={() => saveTagsNotes(lead, { tags: tagsRef.split(',').map(t => t.trim()).filter(Boolean), notes: notesRef })}
+                                  className="btn-primary py-1.5 px-3 text-xs">Save</button>
+                          <button onClick={() => setEditingLead(null)}
+                                  className="text-xs px-3 py-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50">Cancel</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })()}
             </tbody>
           </table>
         </div>

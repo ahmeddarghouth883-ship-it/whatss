@@ -2,33 +2,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '../api/client'
 import { useSocket } from '../hooks/useSocket'
-
-// ── Preset options ────────────────────────────────────────────────────────────
-
-const COUNTRIES = [
-  { label: '🇹🇳 Tunisia',       value: 'Tunisia' },
-  { label: '🇫🇷 France',        value: 'France' },
-  { label: '🇲🇦 Morocco',       value: 'Morocco' },
-  { label: '🇩🇿 Algeria',       value: 'Algeria' },
-  { label: '🇪🇬 Egypt',         value: 'Egypt' },
-  { label: '🇸🇦 Saudi Arabia',  value: 'Saudi Arabia' },
-  { label: '🇦🇪 UAE',           value: 'UAE' },
-  { label: '🇹🇷 Turkey',        value: 'Turkey' },
-  { label: '🇮🇹 Italy',         value: 'Italy' },
-  { label: '🇩🇪 Germany',       value: 'Germany' },
-  { label: '🇪🇸 Spain',         value: 'Spain' },
-  { label: '🇬🇧 UK',            value: 'UK' },
-  { label: '🇺🇸 USA',           value: 'USA' },
-  { label: '🌍 Other…',         value: '' },
-]
-
-const QUICK_REGIONS = {
-  Tunisia: ['Tunis', 'Sfax', 'Sousse', 'Bizerte', 'Nabeul', 'Monastir', 'Hammamet', 'Gabès', 'Kairouan', 'Gafsa'],
-  France:  ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Toulouse', 'Strasbourg', 'Nice', 'Nantes'],
-  Morocco: ['Casablanca', 'Rabat', 'Marrakech', 'Fes', 'Tangier', 'Agadir'],
-  Algeria: ['Algiers', 'Oran', 'Constantine', 'Annaba'],
-  Egypt:   ['Cairo', 'Alexandria', 'Giza', 'Sharm el-Sheikh'],
-}
+import PlacesMapPicker from '../components/PlacesMapPicker'
 
 const QUICK_INDUSTRIES = [
   'restaurants', 'pharmacies', 'lawyers', 'real estate agents',
@@ -38,13 +12,9 @@ const QUICK_INDUSTRIES = [
   'hair salons', 'beauty salons', 'architects', 'accountants',
 ]
 
-const DEFAULT_SPEED_MODE = 'balanced'
-
-const SPEED_OPTIONS = [
-  { value: 'fast', label: 'Fast', hint: 'Best for broad categories and quicker retries' },
-  { value: 'balanced', label: 'Balanced', hint: 'Default quality and runtime trade-off' },
-  { value: 'deep', label: 'Deep', hint: 'Longest per-plan time for hard queries' },
-]
+const MAX_LEADS_HARD_CAP = 500 // server enforces this too
+const DEFAULT_MAX_LEADS  = 200
+const MAX_LEAD_PRESETS   = [60, 200, 500]
 
 function StatusBadge({ status }) {
   const map = { pending:'badge-yellow', running:'badge-blue', done:'badge-green', failed:'badge-red', cancel_requested:'badge-yellow', cancelled:'badge-gray' }
@@ -68,40 +38,89 @@ function timelineEventTone(event) {
 
 function formatTimelineEvent(entry) {
   const event = String(entry?.event || '').toLowerCase()
-  const planLabel = entry?.planIndex ? `plan #${entry.planIndex}` : 'job'
   const added = Number.isFinite(Number(entry?.added)) ? Number(entry.added) : null
   const durationMs = Number.isFinite(Number(entry?.durationMs)) ? Number(entry.durationMs) : null
   const durationLabel = durationMs !== null ? ` in ${Math.max(1, Math.round(durationMs / 1000))}s` : ''
   const addedLabel = added !== null ? ` (+${added})` : ''
 
-  if (event === 'job_started') return 'Job started'
-  if (event === 'job_finished') return `Job finished (${entry?.reason || 'done'})`
-  if (event === 'job_failed') return `Job failed (${entry?.errorCode || 'SCRAPE_FAILURE'})`
-  if (event === 'job_cancelled') return 'Job cancelled by user'
-  if (event === 'job_stopped') return `Job stopped (${entry?.reason || 'stopped'})`
-  if (event === 'plan_started') return `${planLabel} started`
-  if (event === 'plan_completed') return `${planLabel} completed${addedLabel}${durationLabel}`
-  if (event === 'plan_retrying') return `${planLabel} retrying (${entry?.errorCode || 'RETRY'})`
-  if (event === 'plan_timed_out') return `${planLabel} timed out${durationLabel}`
-  if (event === 'plan_failed') return `${planLabel} failed (${entry?.errorCode || 'FAILED'})`
+  const planLabel = entry?.planIndex ? `tile ${entry.planIndex}${entry?.planCount ? `/${entry.planCount}` : ''}` : 'tile'
+
+  if (event === 'job_started')     return entry?.planCount ? `Job started · ${entry.planCount} tile(s)` : 'Job started'
+  if (event === 'job_finished')    return `Job finished${addedLabel}${durationLabel}`
+  if (event === 'job_failed')      return `Job failed (${entry?.errorCode || 'EXTRACTION_FAILURE'})`
+  if (event === 'job_cancelled')   return 'Job cancelled by user'
+  if (event === 'plan_started')    return `${planLabel} started`
+  if (event === 'plan_completed')  return `${planLabel} done${addedLabel}${durationLabel}`
+  if (event === 'plan_failed')     return `${planLabel} failed`
   return event || 'event'
 }
 
 export default function ScrapePage() {
   const socket = useSocket()
 
-  const [country,    setCountry]    = useState('Tunisia')
-  const [customCountry, setCustomCountry] = useState('')
-  const [region,     setRegion]     = useState('')
   const [industry,   setIndustry]   = useState('')
-  const [speedMode,  setSpeedMode]  = useState(DEFAULT_SPEED_MODE)
-  const [maxResults, setMaxResults] = useState(200)
+  const [zonePick,   setZonePick]   = useState(null)   // { lat, lng, radius, address }
+  const [maxResults, setMaxResults] = useState(DEFAULT_MAX_LEADS)
   const [progress,   setProgress]   = useState(null)
   const [jobs,       setJobs]       = useState([])
   const [loading,    setLoading]    = useState(false)
   const [jobsLoading,setJobsLoading]= useState(true)
   const [timelineEvents, setTimelineEvents] = useState([])
   const [timelineMeta, setTimelineMeta] = useState({ included: false, totalEvents: 0, returnedEvents: 0 })
+  const [presets,    setPresets]    = useState([])
+  const [presetSaving, setPresetSaving] = useState(false)
+  const [preview,    setPreview]    = useState(null)   // { existingInZone, existingInCategory, zone, subCategories }
+
+  async function refreshPresets() {
+    try { const r = await api.get('/presets'); setPresets(r.data.presets || []) } catch (_) {}
+  }
+  useEffect(() => { refreshPresets() }, [])
+
+  // Duplicate-detection preview (debounced)
+  useEffect(() => {
+    if (!industry.trim() || !zonePick?.lat || !zonePick?.lng) { setPreview(null); return }
+    const id = setTimeout(async () => {
+      try {
+        const r = await api.get('/scrape/preview', {
+          params: { industry: industry.trim(), lat: zonePick.lat, lng: zonePick.lng, radius: zonePick.radius },
+        })
+        setPreview(r.data)
+      } catch (_) { setPreview(null) }
+    }, 600)
+    return () => clearTimeout(id)
+  }, [industry, zonePick?.lat, zonePick?.lng, zonePick?.radius])
+
+  async function savePreset() {
+    if (!industry.trim() || !zonePick?.lat) return toast.error('Pick a zone and industry first')
+    const name = (window.prompt('Name this preset (e.g. "Tunis pharmacies 5km")') || '').trim()
+    if (!name) return
+    setPresetSaving(true)
+    try {
+      await api.post('/presets', {
+        name, industry: industry.trim(),
+        lat: zonePick.lat, lng: zonePick.lng, radius: zonePick.radius,
+        zone: zonePick.address || '', maxResults,
+      })
+      toast.success(`Preset "${name}" saved`)
+      refreshPresets()
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to save preset')
+    } finally { setPresetSaving(false) }
+  }
+
+  function loadPreset(p) {
+    setIndustry(p.industry)
+    setMaxResults(p.maxResults || DEFAULT_MAX_LEADS)
+    setZonePick({ lat: p.lat, lng: p.lng, radius: p.radius, address: p.zone || '' })
+    api.post(`/presets/${p._id}/use`).catch(() => {})
+    toast.success(`Loaded "${p.name}"`)
+  }
+
+  async function deletePreset(p) {
+    if (!window.confirm(`Delete preset "${p.name}"?`)) return
+    try { await api.delete(`/presets/${p._id}`); toast.success('Preset deleted'); refreshPresets() }
+    catch (e) { toast.error(e?.response?.data?.error || 'Delete failed') }
+  }
 
   async function refreshJobs() {
     setJobsLoading(true)
@@ -113,11 +132,9 @@ export default function ScrapePage() {
     }
   }
 
-  useEffect(() => {
-    refreshJobs()
-  }, [])
+  useEffect(() => { refreshJobs() }, [])
 
-  // Poll job status so completion works even if Socket.IO misses events (proxy / join race)
+  // Poll job status so completion works even if Socket.IO misses events.
   useEffect(() => {
     const jobId = progress?.jobId
     if (!jobId || progress?.phase === 'done' || progress?.phase === 'error') return
@@ -140,14 +157,7 @@ export default function ScrapePage() {
                 : (p.phase === 'starting' ? 'scraping' : p.phase),
               found: Number.isFinite(Number(job.found)) ? Number(job.found) : (p.found || 0),
               saved: Number.isFinite(Number(job.saved)) ? Number(job.saved) : (p.saved || 0),
-              total: Number.isFinite(Number(job.target))
-                ? Number(job.target)
-                : (Number.isFinite(Number(job.maxResults)) ? Number(job.maxResults) : p.total),
-              plansAttempted: Number.isFinite(Number(job.plansAttempted)) ? Number(job.plansAttempted) : p.plansAttempted,
-              retriesUsed: Number.isFinite(Number(job.retriesUsed)) ? Number(job.retriesUsed) : p.retriesUsed,
-              failedPlans: Number.isFinite(Number(job.failedPlans)) ? Number(job.failedPlans) : p.failedPlans,
-              timedOutPlans: Number.isFinite(Number(job.timedOutPlans)) ? Number(job.timedOutPlans) : p.timedOutPlans,
-              speedMode: job.speedMode || p.speedMode,
+              total: Number.isFinite(Number(job.target)) ? Number(job.target) : p.total,
               stopReason: job.stopReason || p.stopReason,
             }
           })
@@ -159,45 +169,16 @@ export default function ScrapePage() {
           if (job.status === 'cancelled') {
             toast('Extraction stopped')
             refreshJobs()
-            return {
-              ...p,
-              phase: 'cancelled',
-              total: Number(job?.found || 0),
-              saved: Number(job?.saved || 0),
-              stopReason: job?.stopReason || p?.stopReason,
-            }
+            return { ...p, phase: 'cancelled', total: Number(job?.found || 0), saved: Number(job?.saved || 0), stopReason: job?.stopReason || p?.stopReason }
           }
           if (job.status === 'failed') {
-            toast.error(`Scrape failed: ${job.error || 'Unknown error'}`)
-            return {
-              ...p,
-              phase: 'error',
-              error: job.error,
-              stopReason: job?.stopReason || p?.stopReason,
-            }
+            toast.error(`Extraction failed: ${job.error || 'Unknown error'}`)
+            return { ...p, phase: 'error', error: job.error, stopReason: job?.stopReason || p?.stopReason }
           }
           if (job.saved > 0) toast.success(`Done! ${job.saved} leads saved`)
-          else {
-            toast.error(
-              'No leads extracted (no phone numbers found on Google Maps). Try another region or category.'
-            )
-          }
+          else toast.error('No leads extracted (no phone numbers returned). Try a wider radius or another industry.')
           refreshJobs()
-          return {
-            ...p,
-            phase: 'done',
-            saved: job.saved,
-            dupes: job.dupes,
-            total: job.found,
-            zone: job.zone,
-            category: job.category,
-            plansAttempted: job.plansAttempted,
-            retriesUsed: job.retriesUsed,
-            failedPlans: job.failedPlans,
-            timedOutPlans: job.timedOutPlans,
-            speedMode: job.speedMode || p.speedMode,
-            stopReason: job.stopReason,
-          }
+          return { ...p, phase: 'done', saved: job.saved, dupes: job.dupes, total: job.found, zone: job.zone, category: job.category, stopReason: job.stopReason }
         })
       } catch (_) {}
     }, 1500)
@@ -205,14 +186,7 @@ export default function ScrapePage() {
   }, [progress?.jobId, progress?.phase])
 
   useEffect(() => {
-    const onStarted  = d => setProgress((p) => ({
-      ...(p || {}),
-      ...d,
-      phase: 'scraping',
-      saved: p?.saved ?? 0,
-      found: p?.found ?? 0,
-      startedAt: p?.startedAt || Date.now(),
-    }))
+    const onStarted  = d => setProgress((p) => ({ ...(p || {}), ...d, phase: 'scraping', saved: p?.saved ?? 0, found: p?.found ?? 0, startedAt: p?.startedAt || Date.now() }))
     const onFound    = d => setProgress(p => p ? { ...p, found: d.count } : p)
     const onSaving   = d => setProgress(p => p ? { ...p, total: d.total, phase: 'saving' } : p)
     const onProgress = d => setProgress(p => p ? { ...p, ...d } : p)
@@ -220,11 +194,7 @@ export default function ScrapePage() {
       setProgress((p) => {
         if (!p || p.phase === 'done' || p.phase === 'error') return p
         if (d.saved > 0) toast.success(`Done! ${d.saved} leads saved`)
-        else {
-          toast.error(
-            'No leads extracted (no phone numbers found on Google Maps). Try another region or category.'
-          )
-        }
+        else toast.error('No leads extracted (no phone numbers returned). Try a wider radius or another industry.')
         refreshJobs()
         return { ...p, ...d, phase: 'done' }
       })
@@ -232,7 +202,7 @@ export default function ScrapePage() {
     const onError = d => {
       setProgress((p) => {
         if (!p || p.phase === 'error' || p.phase === 'done') return p
-        toast.error(`Scrape failed: ${d.message}`)
+        toast.error(`Extraction failed: ${d.message}`)
         return { ...p, phase: 'error', error: d.message }
       })
     }
@@ -262,49 +232,41 @@ export default function ScrapePage() {
     }
   }, [socket])
 
-  const resolvedCountry = country || customCountry.trim()
-  const zone = [region.trim(), resolvedCountry].filter(Boolean).join(', ')
-  const canStart = industry.trim() && region.trim() && resolvedCountry
+  const canStart = Boolean(industry.trim() && zonePick?.lat != null && zonePick?.lng != null)
 
   async function startScrape() {
-    if (!canStart) return toast.error('Fill in Country, Region and Industry')
+    if (!canStart) return toast.error('Pick a zone on the map and enter an industry')
     setLoading(true)
     setTimelineEvents([])
     setTimelineMeta({ included: true, totalEvents: 0, returnedEvents: 0 })
-    const requestStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
     const startedAt = Date.now()
+    const safeMax = Math.max(10, Math.min(MAX_LEADS_HARD_CAP, Number(maxResults) || DEFAULT_MAX_LEADS))
     setProgress({
-      zone,
+      zone:     zonePick.address || `${zonePick.lat.toFixed(3)},${zonePick.lng.toFixed(3)}`,
       category: industry.trim(),
-      phase: 'starting',
-      saved: 0,
-      found: 0,
+      phase:    'starting',
+      saved:    0,
+      found:    0,
+      total:    safeMax,
       startedAt,
-      speedMode,
-      startLatencyMs: null,
-      jobId: null,
+      jobId:    null,
     })
     try {
       const res = await api.post('/scrape/zone', {
-        zone,
-        category: industry.trim(),
-        speedMode,
-        maxResults,
+        industry:   industry.trim(),
+        lat:        zonePick.lat,
+        lng:        zonePick.lng,
+        radius:     zonePick.radius,
+        maxResults: safeMax,
+        zone:       zonePick.address || `${zonePick.lat.toFixed(3)},${zonePick.lng.toFixed(3)}`,
       })
-      const acceptedInMs = Math.max(0, Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - requestStartedAt))
-      toast.success('Scrape started!')
-      setProgress((p) => p ? { ...p, jobId: res.data.jobId, startLatencyMs: acceptedInMs } : p)
+      toast.success('Extraction started!')
+      setProgress((p) => p ? { ...p, jobId: res.data.jobId, total: res.data.target || safeMax } : p)
     } catch (err) {
       setProgress(null)
       const serverMsg = err.response?.data?.error
-      const net =
-        !err.response &&
-        (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED' || err.message === 'Network Error')
-      const msg =
-        serverMsg ||
-        (net ? 'Cannot reach the API. Start the backend (npm start) on port 5000.' : null) ||
-        err.message ||
-        'Failed to start scrape'
+      const net = !err.response && (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED' || err.message === 'Network Error')
+      const msg = serverMsg || (net ? 'Cannot reach the API. Start the backend (npm start) on port 5000.' : null) || err.message || 'Failed to start extraction'
       toast.error(msg)
     } finally {
       setLoading(false)
@@ -322,9 +284,8 @@ export default function ScrapePage() {
     }
   }
 
-  const pct = progress?.total
-    ? Math.round((progress.saved / progress.total) * 100)
-    : (progress?.phase === 'scraping' ? null : 0)
+  const pct = progress?.total ? Math.round((progress.saved / progress.total) * 100)
+           : (progress?.phase === 'scraping' ? null : 0)
 
   const elapsedSec = progress?.startedAt ? Math.max(1, Math.round((Date.now() - progress.startedAt) / 1000)) : 0
   const foundRate = progress?.found ? (progress.found / elapsedSec) : 0
@@ -334,11 +295,9 @@ export default function ScrapePage() {
     : null
   const timelinePreview = timelineEvents.slice(-12).reverse()
   const timelineSummaryTotal = Number.isFinite(Number(timelineMeta?.totalEvents))
-    ? Number(timelineMeta.totalEvents)
-    : timelineEvents.length
+    ? Number(timelineMeta.totalEvents) : timelineEvents.length
   const timelineSummaryReturned = Number.isFinite(Number(timelineMeta?.returnedEvents))
-    ? Number(timelineMeta.returnedEvents)
-    : timelineEvents.length
+    ? Number(timelineMeta.returnedEvents) : timelineEvents.length
 
   const fmtDuration = (sec) => {
     const s = Math.max(0, Number(sec) || 0)
@@ -347,92 +306,39 @@ export default function ScrapePage() {
     return m > 0 ? `${m}m ${String(r).padStart(2, '0')}s` : `${r}s`
   }
 
-  const quickRegions = QUICK_REGIONS[resolvedCountry] || []
-
   return (
     <div className="p-4 sm:p-8 max-w-4xl text-gray-900 dark:text-gray-100">
 
-      {/* Header */}
       <div className="mb-6">
-        <h2 className="font-serif text-2xl sm:text-3xl text-gray-900 dark:text-gray-100">Scrape contacts</h2>
+        <h2 className="font-serif text-2xl sm:text-3xl text-gray-900 dark:text-gray-100">Extract leads</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Extract business contacts from Google Maps — pick a country, region and industry.
+          Type the industry you want to target, pick a zone on the map, then choose how many leads to pull. Phone-verified businesses are saved straight to your Leads.
         </p>
       </div>
 
-      {/* ── 3-field form ── */}
-      <div className="card p-5 sm:p-6 mb-5 space-y-5">
-
-        {/* Row 1: Country + Region */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-          {/* Country */}
-          <div>
-            <p className="label">Country</p>
-            <div className="flex flex-wrap gap-1.5">
-              {COUNTRIES.map(c => (
-                <button
-                  key={c.value + c.label}
-                  type="button"
-                  onClick={() => { setCountry(c.value); if (c.value) setCustomCountry('') }}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors font-medium ${
-                    country === c.value
-                      ? 'bg-green-600 border-green-600 text-white'
-                      : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-green-300 hover:text-green-700 dark:hover:border-green-500 dark:hover:text-green-300'
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-            {country === '' && (
-              <input
-                id="scrape-country-custom"
-                name="country"
-                className="input mt-2"
-                value={customCountry}
-                onChange={e => setCustomCountry(e.target.value)}
-                placeholder="Type country name…"
-                autoComplete="country-name"
-                autoFocus
-              />
-            )}
+      {/* Presets row */}
+      {presets.length > 0 && (
+        <div className="card p-3 sm:p-4 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Saved presets</p>
+            <span className="text-[11px] text-gray-400">{presets.length} saved</span>
           </div>
-
-          {/* Region / City */}
-          <div>
-            <label className="label" htmlFor="scrape-region">Region / City</label>
-            <input
-              id="scrape-region"
-              name="region"
-              className="input"
-              value={region}
-              onChange={e => setRegion(e.target.value)}
-              placeholder={resolvedCountry ? `e.g. ${resolvedCountry === 'Tunisia' ? 'Tunis, Sfax, Sousse' : 'city or district'}` : 'City or district'}
-              onKeyDown={e => e.key === 'Enter' && startScrape()}
-            />
-            {quickRegions.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {quickRegions.map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRegion(r)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      region === r
-                        ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-300'
-                        : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map(p => (
+              <span key={p._id} className="inline-flex items-center gap-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full pl-3 pr-1 py-1">
+                <button onClick={() => loadPreset(p)} className="text-gray-700 dark:text-gray-200 hover:text-green-700">
+                  {p.name} <span className="text-gray-400 dark:text-gray-500">· {p.industry}</span>
+                </button>
+                <button onClick={() => deletePreset(p)} className="text-gray-300 hover:text-red-500 text-base leading-none px-1" title={`Delete preset ${p.name}`}>×</button>
+              </span>
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Row 2: Industry */}
+      <div className="card p-5 sm:p-6 mb-5 space-y-5">
+
+        {/* Industry */}
         <div>
           <label className="label" htmlFor="scrape-industry">Industry / Category</label>
           <input
@@ -442,7 +348,7 @@ export default function ScrapePage() {
             value={industry}
             onChange={e => setIndustry(e.target.value)}
             placeholder="e.g. pharmacies, lawyers, car dealers, architects…"
-            onKeyDown={e => e.key === 'Enter' && startScrape()}
+            onKeyDown={e => e.key === 'Enter' && canStart && startScrape()}
           />
           <div className="flex flex-wrap gap-1.5 mt-2">
             {QUICK_INDUSTRIES.map(ind => (
@@ -462,69 +368,94 @@ export default function ScrapePage() {
           </div>
         </div>
 
-        {/* Row 3: Max results + query preview + start */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 pt-1 border-t border-gray-100">
-          <div>
-            <label className="label" htmlFor="scrape-max-results">Max results</label>
-            <input
-              id="scrape-max-results"
-              name="maxResults"
-              type="number"
-              className="input w-28"
-              value={maxResults}
-              min={10} step={10}
-              onChange={e => setMaxResults(Math.max(10, Number(e.target.value) || 10))}
-            />
-            <div className="flex gap-1.5 mt-2">
-              {[100, 200, 400].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setMaxResults(n)}
-                  className={`text-xs px-2 py-1 rounded border ${maxResults === n ? 'bg-green-50 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-500'}`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Map picker */}
+        <div>
+          <p className="label">Zone on map</p>
+          <PlacesMapPicker value={zonePick} onChange={setZonePick} />
+        </div>
 
-          <div>
-            <p className="label">Mode</p>
-            <div className="flex gap-1.5 mt-1">
-              {SPEED_OPTIONS.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setSpeedMode(m.value)}
-                  className={`text-xs px-2.5 py-1.5 rounded border ${speedMode === m.value ? 'bg-green-50 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-500'}`}
-                >
-                  {m.label}
-                </button>
-              ))}
+        {/* Max leads */}
+        <div>
+          <label className="label" htmlFor="extract-max">Max leads</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="extract-max"
+                name="maxResults"
+                type="number"
+                min={10}
+                max={MAX_LEADS_HARD_CAP}
+                step={10}
+                value={maxResults}
+                onChange={(e) => {
+                  const n = Math.max(10, Math.min(MAX_LEADS_HARD_CAP, Number(e.target.value) || DEFAULT_MAX_LEADS))
+                  setMaxResults(n)
+                }}
+                className="input w-28"
+              />
+              <div className="flex gap-1.5">
+                {MAX_LEAD_PRESETS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setMaxResults(n)}
+                    className={`text-xs px-2.5 py-1.5 rounded border ${
+                      maxResults === n
+                        ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300'
+                        : 'bg-white border-gray-200 text-gray-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1 max-w-[220px]">
-              {SPEED_OPTIONS.find((m) => m.value === speedMode)?.hint}
-            </p>
-          </div>
+        </div>
 
-          {/* Live query preview */}
-          <div className="flex-1">
+        {/* Preview / duplicate warning */}
+        {preview && (preview.existingInZone > 0 || preview.existingInCategory > 0) && (
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 p-3 text-xs text-yellow-800 dark:text-yellow-200">
+            {preview.existingInZone > 0
+              ? <>You already have <b>{preview.existingInZone}</b> {preview.industry} in <b>{preview.zone}</b>. Re-extracting will dedup by phone but still uses API quota.</>
+              : <>You already have <b>{preview.existingInCategory}</b> total {preview.industry} (other zones). Re-extracting may overlap.</>}
+            {Array.isArray(preview.subCategories) && preview.subCategories.length > 1 && (
+              <p className="mt-1 text-[11px] text-yellow-700 dark:text-yellow-300">
+                Will fan out into {preview.subCategories.length} sub-queries: {preview.subCategories.slice(0, 6).join(', ')}{preview.subCategories.length > 6 ? '…' : ''}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Query preview + start */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide font-medium">Search query</p>
             <p className="text-sm text-gray-700 dark:text-gray-200 font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 truncate">
               {canStart
-                ? `"${industry.trim()}" in ${zone}`
-                : <span className="text-gray-300">fill in the fields above…</span>}
+                ? `"${industry.trim()}" within ${(zonePick.radius / 1000).toFixed(1)}km of ${zonePick.address || `${zonePick.lat.toFixed(3)},${zonePick.lng.toFixed(3)}`} · target ${maxResults}`
+                : <span className="text-gray-300">fill in industry and pick a zone…</span>}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Phone-verified businesses are deduped and saved to your <a href="/leads" className="text-green-600 hover:underline">Leads</a>.
             </p>
           </div>
 
-          <button
-            onClick={startScrape}
-            disabled={loading || !canStart || progress?.phase === 'scraping' || progress?.phase === 'saving'}
-            className="btn-primary py-2.5 px-6 w-full sm:w-auto justify-center"
-          >
-            {loading ? 'Queuing…' : '⊕ Start scrape'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              onClick={savePreset}
+              disabled={presetSaving || !canStart}
+              className="text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50"
+              title="Save as preset for one-click reuse"
+            >
+              {presetSaving ? 'Saving…' : '☆ Save preset'}
+            </button>
+            <button
+              onClick={startScrape}
+              disabled={loading || !canStart || progress?.phase === 'scraping' || progress?.phase === 'saving'}
+              className="btn-primary py-2.5 px-6 w-full sm:w-auto justify-center"
+            >
+              {loading ? 'Queuing…' : '⊕ Start extraction'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -541,16 +472,10 @@ export default function ScrapePage() {
                  progress.phase === 'error'    ? '❌ Failed' :
                  progress.phase === 'cancelled' ? '⏹️ Stopped' :
                  progress.phase === 'cancel_requested' ? '⏹️ Stopping…' :
-                 progress.phase === 'scraping' ? '🔍 Scraping Google Maps…' :
+                 progress.phase === 'scraping' ? '🔍 Querying Google Places…' :
                  progress.phase === 'saving'   ? '💾 Saving to database…' : '⏳ Starting…'}
               </span>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">{progress.zone} · {progress.category}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">mode: {String(progress.speedMode || speedMode)}</p>
-              {progress.startLatencyMs !== null && (
-                <p className="text-xs text-blue-600 dark:text-blue-300 mt-0.5 font-mono">
-                  accepted in {progress.startLatencyMs} ms
-                </p>
-              )}
             </div>
             {progress.phase === 'done' && (
               <span className="text-sm text-green-700 font-mono whitespace-nowrap">{progress.saved} saved</span>
@@ -627,11 +552,6 @@ export default function ScrapePage() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-mono ${timelineEventTone(entry.event)}`}>
                           {formatTimelineEvent(entry)}
                         </span>
-                        {(entry.zone || entry.category) && (
-                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 truncate font-mono">
-                            {[entry.zone, entry.category].filter(Boolean).join(' · ')}
-                          </p>
-                        )}
                       </div>
                       <span className="text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap font-mono">
                         {formatTimelineClock(entry.at)}
@@ -653,7 +573,7 @@ export default function ScrapePage() {
       {/* Past jobs */}
       <div className="card overflow-hidden">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-serif text-lg text-gray-900 dark:text-gray-100">Scrape history</h3>
+          <h3 className="font-serif text-lg text-gray-900 dark:text-gray-100">Extraction history</h3>
           <button
             type="button"
             onClick={refreshJobs}
@@ -666,7 +586,7 @@ export default function ScrapePage() {
         {jobsLoading ? (
           <div className="p-6 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
         ) : jobs.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 dark:text-gray-500 text-sm">No scrape jobs yet. Start your first one above.</div>
+          <div className="p-8 text-center text-gray-400 dark:text-gray-500 text-sm">No extractions yet. Start your first one above.</div>
         ) : (
           <>
             <div className="hidden sm:block overflow-x-auto">

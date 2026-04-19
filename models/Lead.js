@@ -12,6 +12,8 @@ const LeadSchema = new mongoose.Schema({
   rating:           { type: Number },
   reviews:          { type: Number },
   website:          { type: String },
+  email:            { type: String, lowercase: true, trim: true },
+  enrichedAt:       { type: Date },
   whatsappVerified: { type: Boolean, default: false },
   whatsappCheckedAt:{ type: Date },
   tags:             [{ type: String }],

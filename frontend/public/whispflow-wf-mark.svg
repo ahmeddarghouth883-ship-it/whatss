@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64" fill="none" aria-hidden="true">
+  <title>WhispFlow</title>
+  <!-- W -->
+  <path
+    d="M 8 6 L 22 58 L 36 22 L 50 58 L 64 6"
+    stroke="#22c55e"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- f (connected to W) -->
+  <path
+    d="M 72 58 L 72 6 L 108 6 M 72 32 L 102 32"
+    stroke="#22c55e"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

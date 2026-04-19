@@ -68,7 +68,10 @@ export default function LoginPage() {
   async function onSubmit(data) {
     setLoading(true)
     try {
-      const res = await api.post('/auth/login', data)
+      const res = await api.post('/auth/login', {
+        email: String(data.email || '').trim().toLowerCase(),
+        password: String(data.password ?? ''),
+      })
       login(res.data.token, res.data.user)
       toast.success(`Welcome, ${res.data.user.name}!`)
       navigate('/dashboard')

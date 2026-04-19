@@ -9,7 +9,7 @@ import AppHeaderBar from './AppHeaderBar'
 const NAV_ITEMS = [
   { to: '/dashboard', key: 'nav.dashboard',   icon: <DashIcon /> },
   { to: '/compose',   key: 'nav.compose',     icon: <ComposeIcon /> },
-  { to: '/scrape',    key: 'nav.scrape',      icon: <ScrapeIcon /> },
+  { to: '/scrape',    key: 'nav.extract',     icon: <ScrapeIcon /> },
   { to: '/leads',     key: 'nav.leads',       icon: <LeadsIcon /> },
   { to: '/campaigns', key: 'nav.campaigns',   icon: <CampaignIcon /> },
   { to: '/inbox',     key: 'nav.inbox',       icon: <InboxIcon /> },
@@ -260,7 +260,7 @@ export default function Layout() {
               {activeScrape && !activeSend && (
                 <span className="truncate">
                   {activeScrape.phase === 'scraping'
-                    ? `🔍 ${t('layout.scrapingFound', { n: activeScrape.found ?? 0 })}`
+                    ? `🔍 ${t('layout.extractingFound', { n: activeScrape.found ?? 0 })}`
                     : `💾 ${t('layout.savingLeads', { saved: activeScrape.saved ?? 0, total: activeScrape.total ?? '?' })}`}
                 </span>
               )}

@@ -2,12 +2,14 @@
 import { Toaster } from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { ThemeProvider } from './contexts/ThemeContext'
 import LanguageSync from './components/LanguageSync'
 
 import Layout          from './components/Layout'
 import LoginPage       from './pages/LoginPage'
 import RegisterPage    from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import LandingPage     from './pages/LandingPage'
 import Dashboard       from './pages/Dashboard'
 import ScrapePage      from './pages/ScrapePage'
 import LeadsPage       from './pages/LeadsPage'
@@ -51,30 +53,42 @@ function ProtectedRoute({ children, adminOnly = false }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <LanguageSync />
-        <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
-        <Routes>
-          <Route path="/login"    element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard"   element={<Dashboard />} />
-            <Route path="scrape"      element={<ScrapePage />} />
-            <Route path="leads"       element={<LeadsPage />} />
-            <Route path="campaigns"   element={<CampaignsPage />} />
-            <Route path="campaigns/:id" element={<CampaignDetail />} />
-            <Route path="inbox"       element={<InboxPage />} />
-            <Route path="compose"     element={<ComposePage />} />
-            <Route path="sessions"    element={<SessionsPage />} />
-            <Route path="wallet"      element={<WalletPage />} />
-            <Route path="settings"    element={<SettingsPage />} />
-            <Route path="admin"       element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <LanguageSync />
+          <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+          <Routes>
+            {/* Public landing page */}
+            <Route path="/" element={<LandingPage />} />
+
+            {/* Auth routes */}
+            <Route path="/login"    element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+            {/* App (protected) — single Layout instance shared across all app routes */}
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route path="/dashboard"     element={<Dashboard />} />
+              <Route path="/scrape"        element={<ScrapePage />} />
+              <Route path="/leads"         element={<LeadsPage />} />
+              <Route path="/campaigns"     element={<CampaignsPage />} />
+              <Route path="/campaigns/:id" element={<CampaignDetail />} />
+              <Route path="/inbox"         element={<InboxPage />} />
+              <Route path="/compose"       element={<ComposePage />} />
+              <Route path="/sessions"      element={<SessionsPage />} />
+              <Route path="/wallet"        element={<WalletPage />} />
+              <Route path="/settings"      element={<SettingsPage />} />
+              <Route path="/admin"         element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

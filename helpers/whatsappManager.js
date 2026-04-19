@@ -80,21 +80,59 @@ async function createClient(sessionId, userId, io) {
 
   client.on('message', async (msg) => {
     // Track incoming replies
-    const Message = require('../models/Message');
-    const Lead    = require('../models/Lead');
+    const Message        = require('../models/Message');
+    const InboundMessage = require('../models/InboundMessage');
+    const Lead           = require('../models/Lead');
+
+    // Ignore status broadcasts and group messages — those aren't 1:1 replies
+    if (!msg || !msg.from || msg.from === 'status@broadcast') return;
+    if (String(msg.from).endsWith('@g.us')) return;
 
     const phone = msg.from.replace('@c.us', '');
-    emit('wa:reply', { phone, body: msg.body, timestamp: msg.timestamp });
+    const body  = msg.body || '';
 
-    // Mark message as replied
+    let contactName = '';
+    try {
+      const contact = await msg.getContact();
+      contactName = contact?.pushname || contact?.name || contact?.shortName || '';
+    } catch (_) { /* ignore */ }
+
+    let mediaUrl = null;
+    let mediaType = null;
+    if (msg.hasMedia) {
+      // Only record the type — don't download bytes here to keep the handler fast
+      mediaType = String(msg.type || 'document').toLowerCase();
+    }
+
+    // Persist the inbound message so the Inbox UI can render conversation threads.
+    // Unique (userId, waMessageId) index makes redeliveries safe.
+    try {
+      await InboundMessage.create({
+        userId,
+        sessionId,
+        fromPhone:   phone,
+        contactName,
+        body,
+        mediaUrl,
+        mediaType,
+        waMessageId: msg.id?._serialized || msg.id?.id || null,
+        receivedAt:  new Date((msg.timestamp || Date.now() / 1000) * 1000),
+      });
+    } catch (e) {
+      if (e?.code !== 11000) console.warn('[wa/message] InboundMessage.create:', e.message);
+    }
+
+    emit('wa:reply', { phone, body, contactName, mediaType, timestamp: msg.timestamp });
+
+    // Mark the most recent outbound message as replied
     await Message.findOneAndUpdate(
       { userId, phone, status: { $in: ['sent', 'delivered', 'read'] } },
       { status: 'replied', repliedAt: new Date() },
       { sort: { sentAt: -1 } }
-    );
+    ).catch(() => {});
 
     // Update lead lastContacted
-    await Lead.findOneAndUpdate({ userId, phone }, { lastContacted: new Date() });
+    await Lead.findOneAndUpdate({ userId, phone }, { lastContacted: new Date() }).catch(() => {});
   });
 
   client.on('message_ack', async (msg, ack) => {

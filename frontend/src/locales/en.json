@@ -72,7 +72,8 @@
     "failed": "Sign in failed"
   },
   "register": {
-    "subtitle": "Create your account",
+    "badge": "Get started",
+    "subtitle": "Create your account — trial credits apply automatically after signup.",
     "selectPlan": "Select plan",
     "fullName": "Full name",
     "company": "Company (optional)",

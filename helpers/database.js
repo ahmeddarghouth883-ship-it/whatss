@@ -100,6 +100,12 @@ function canFallbackToMemory(err) {
 }
 
 async function connectDB() {
+  // Avoid duplicate connections (nodemon reload, tests, or double require).
+  if (mongoose.connection.readyState === 1) {
+    console.log('✅ MongoDB already connected — skipping new connection');
+    return;
+  }
+
   let uri;
   try {
     uri = await resolveMongoUri();

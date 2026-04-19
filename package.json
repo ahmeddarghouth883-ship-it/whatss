@@ -1,0 +1,33 @@
+{
+  "name": "whispflow-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend server for WhispFlow — Google Places (New) lead scraper + minimal auth.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "reset-db": "node scripts/resetMongo.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.3.2",
+    "google-auth-library": "^9.15.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^6.9.13",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5",
+    "whatsapp-web.js": "^1.23.0"
+  },
+  "optionalDependencies": {
+    "mongodb-memory-server": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -8,17 +8,28 @@ import { getRequestErrorMessage } from '../api/errors'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../contexts/ThemeContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import './register-page.css'
 
 export default function RegisterPage() {
   const { t, i18n } = useTranslation()
   const { theme, toggleTheme } = useTheme()
+
+  // Prefill email if the user came from the landing-page hero capture (?email=...)
+  const prefilledEmail = (() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const p = new URLSearchParams(window.location.search)
+      return String(p.get('email') || '').trim()
+    } catch { return '' }
+  })()
+
   const {
     register,
     handleSubmit,
     formState: { errors }
   } = useForm({
     defaultValues: {
-      plan: 'free'
+      email: prefilledEmail,
     }
   })
   const [loading, setLoading] = useState(false)
@@ -65,6 +76,13 @@ export default function RegisterPage() {
       }
 
       const res = await api.post('/auth/register', payload)
+      // Server returns JWT immediately — log in and skip the email-code step.
+      if (res.data?.token && res.data?.user) {
+        login(res.data.token, res.data.user)
+        toast.success(res?.data?.message || 'Account created.')
+        navigate('/dashboard')
+        return
+      }
       setPendingEmail(payload.email)
       setStep('verify')
       toast.success(res?.data?.message || 'Account created. Check your email for verification code.')
@@ -133,10 +151,11 @@ export default function RegisterPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 px-4 py-6 sm:py-8"
+      className="register-shell px-4 py-6 sm:py-10"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="flex justify-end gap-2 mb-4 max-w-md mx-auto w-full">
+      <div className="register-shell-inner flex flex-col min-h-screen">
+      <div className="flex justify-end gap-2 mb-6 max-w-md mx-auto w-full">
         <select
           id="register-language"
           name="language"
@@ -157,33 +176,24 @@ export default function RegisterPage() {
           {theme === 'dark' ? '☀' : '☾'}
         </button>
       </div>
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex items-center justify-center pb-8">
+        <div className="w-full max-w-md register-card-wrap">
           <div className="text-center mb-8">
-            <h1 className="font-serif text-4xl text-gray-900 dark:text-gray-100 mb-1">
-              Whisp<span className="text-green-600">Flow</span>
+            <div className="register-badge">
+              <span className="register-badge-dot" aria-hidden />
+              {t('register.badge')}
+            </div>
+            <h1 className="register-title text-4xl sm:text-5xl font-semibold mb-2">
+              Whisp<span className="text-green-600 dark:text-green-400">Flow</span>
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('register.subtitle')}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+              {t('register.subtitle')}
+            </p>
           </div>
 
-          <div className="card p-5 sm:p-8">
+          <div className="register-card p-6 sm:p-9">
             {step === 'register' ? (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div>
-                  <label htmlFor="register-plan" className="label">{t('register.selectPlan')}</label>
-                  <select
-                    id="register-plan"
-                    name="plan"
-                    className="input"
-                    {...register('plan')}
-                  >
-                    <option value="free">{t('register.plans.free')} - {t('register.plans.freePrice')}</option>
-                    <option value="starter">{t('register.plans.starter')} - {t('register.plans.perMonth', { price: 59 })}</option>
-                    <option value="pro">{t('register.plans.pro')} - {t('register.plans.perMonth', { price: 149 })}</option>
-                    <option value="agency">{t('register.plans.agency')} - {t('register.plans.perMonth', { price: 399 })}</option>
-                  </select>
-                </div>
-
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div>
                   <label htmlFor="register-name" className="label">{t('register.fullName')}</label>
                   <input
@@ -241,7 +251,7 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">
+                <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-3 rounded-xl shadow-lg shadow-green-600/20">
                   {loading ? t('register.submitLoading') : t('register.submit')}
                 </button>
 
@@ -292,13 +302,14 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+          <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
             {t('register.haveAccount')}{' '}
-            <Link to="/login" className="text-green-600 hover:text-green-700 font-medium">
+            <Link to="/login" className="text-green-600 dark:text-green-400 hover:text-green-700 font-semibold">
               {t('register.signIn')}
             </Link>
           </p>
         </div>
+      </div>
       </div>
     </div>
   )

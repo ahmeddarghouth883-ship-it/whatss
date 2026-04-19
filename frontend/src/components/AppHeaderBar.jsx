@@ -6,7 +6,7 @@ export default function AppHeaderBar() {
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <div className="hidden lg:flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex-shrink-0 justify-end">
+    <div className="hidden lg:flex items-center gap-3 px-4 py-2 border-b border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex-shrink-0 justify-end">
       <label className="sr-only" htmlFor="wf-lang">{t('common.language')}</label>
       <select
         id="wf-lang"

@@ -1,0 +1,95 @@
+/* Register / auth shell — scoped visual polish */
+.register-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -30%, rgba(34, 197, 94, 0.22), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 50%, rgba(59, 130, 246, 0.08), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 0% 80%, rgba(34, 197, 94, 0.06), transparent 45%);
+}
+
+.dark .register-shell {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -30%, rgba(34, 197, 94, 0.15), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 40%, rgba(59, 130, 246, 0.12), transparent 50%),
+    linear-gradient(180deg, #030712 0%, #0a0f1a 50%, #030712 100%);
+}
+
+.register-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2322c55e' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.9;
+  z-index: 0;
+}
+
+.register-shell-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.register-card-wrap {
+  perspective: 1200px;
+}
+
+.register-card {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03),
+    0 24px 48px -12px rgba(0, 0, 0, 0.12),
+    0 0 80px -20px rgba(34, 197, 94, 0.25);
+}
+
+.dark .register-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 24px 48px -12px rgba(0, 0, 0, 0.45),
+    0 0 80px -24px rgba(34, 197, 94, 0.2);
+}
+
+.register-title {
+  font-family: ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #0f172a 0%, #334155 50%, #15803d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dark .register-title {
+  background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 45%, #4ade80 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.register-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgb(22 163 74);
+  margin-bottom: 0.75rem;
+}
+
+.register-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(34 197 94);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.7);
+}

@@ -102,8 +102,8 @@ export default function SessionsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {sessions.map(session => (
-            <div key={session.sessionId} className="card p-4 sm:p-5">
+          {sessions.map((session, idx) => (
+            <div key={session.sessionId || `session-${idx}`} className="card p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <StatusDot status={session.status} />

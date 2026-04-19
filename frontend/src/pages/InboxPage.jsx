@@ -26,6 +26,19 @@ function initials(s) {
   return parts.map(p => p[0]).join('').toUpperCase()
 }
 
+/** Hide raw WhatsApp ids like …@lid in the UI */
+function safePhoneLabel(p) {
+  const s = String(p ?? '')
+  if (!s) return ''
+  if (s.includes('@lid') || s.includes('@c.us')) {
+    const local = s.split('@')[0].replace(/^\+/, '')
+    const d = local.replace(/\D/g, '')
+    return d ? `+${d}` : local
+  }
+  const d = s.replace(/\D/g, '')
+  return d ? `+${d}` : s
+}
+
 function StatusTick({ status }) {
   if (status === 'replied' || status === 'read')
     return <span className="text-blue-500 text-xs ml-1">✓✓</span>
@@ -48,12 +61,12 @@ function ThreadRow({ thread, active, onClick }) {
       ].join(' ')}
     >
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-        {initials(thread.contactName || thread.phone)}
+        {initials(thread.contactName || thread.displayPhone || thread.phone)}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-            {thread.contactName || thread.phone}
+            {thread.contactName || thread.displayPhone || safePhoneLabel(thread.phone)}
           </p>
           <span className="text-[11px] text-gray-400 flex-shrink-0">{fmtTime(thread.lastAt)}</span>
         </div>
@@ -68,8 +81,8 @@ function ThreadRow({ thread, active, onClick }) {
             </span>
           )}
         </div>
-        {thread.contactName && thread.contactName !== thread.phone && (
-          <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">{thread.phone}</p>
+        {thread.contactName && thread.displayPhone && (
+          <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">{thread.displayPhone}</p>
         )}
       </div>
     </button>
@@ -334,13 +347,15 @@ export default function InboxPage() {
                   ←
                 </button>
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                  {initials(thread?.contactName || active)}
+                  {initials(thread?.contactName || thread?.displayPhone || active)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                    {thread?.contactName || active}
+                    {thread?.contactName || thread?.displayPhone || safePhoneLabel(active)}
                   </p>
-                  <p className="text-xs text-gray-400 font-mono truncate">+{active}</p>
+                  <p className="text-xs text-gray-400 font-mono truncate">
+                    {thread?.displayPhone || safePhoneLabel(active)}
+                  </p>
                 </div>
                 {thread?.lead?._id && (
                   <Link to="/leads" className="text-xs text-green-600 hover:underline whitespace-nowrap">

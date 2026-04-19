@@ -23,6 +23,7 @@ const { resetDatabase } = require('./helpers/resetDatabase');
 const { seedAdminUser } = require('./helpers/seedAdmin');
 const { seedPlans }     = require('./helpers/seedPlans');
 const { startScheduler } = require('./helpers/scheduler');
+const { startDirectSendWorker } = require('./helpers/directSendWorker');
 
 // Required defaults so development works without a .env file.
 process.env.JWT_SECRET     = process.env.JWT_SECRET     || 'dev-secret-change-me';
@@ -166,6 +167,7 @@ app.use((err, req, res, _next) => {
     await seedAdminUser();
     await seedPlans();
     startScheduler(io);
+    startDirectSendWorker(io);
     const port = Number(process.env.PORT);
     server.listen(port, () => {
       console.log(`Server listening on http://localhost:${port}`);

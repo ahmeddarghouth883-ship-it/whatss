@@ -35,7 +35,8 @@
     "failed": "échoués",
     "extractingFound": "Extraction… {{n}} trouvés",
     "savingLeads": "Enregistrement… {{saved}}/{{total}}",
-    "runsInBackground": "Continue en arrière-plan — navigation sûre"
+    "runsInBackground": "Continue en arrière-plan — navigation sûre",
+    "coolingPause": "Pause jusqu'à {{time}} (limite de débit)"
   },
   "dashboard": {
     "greeting": "Bonjour, {{name}}",

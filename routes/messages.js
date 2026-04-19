@@ -17,8 +17,12 @@ const { messageLimiter } = require('../helpers/rateLimit');
 const Message            = require('../models/Message');
 const Campaign           = require('../models/Campaign');
 const ScheduledMessage   = require('../models/ScheduledMessage');
+const DirectSendJob      = require('../models/DirectSendJob');
+const { checkDirectJobs } = require('../helpers/directSendWorker');
 const wallet             = require('../helpers/wallet');
 const { sendMessage }    = require('../helpers/whatsappManager');
+const { touchLeadLastContactedByPhone } = require('../helpers/leadContact');
+const { canonicalPeerDigits, formatPeerDigitsLine } = require('../helpers/waIdentity');
 
 const router = express.Router();
 
@@ -55,7 +59,10 @@ router.get('/replies', authenticate, async (req, res) => {
     // Shape to match the previous response the old UI expected
     const messages = items.map((m) => ({
       _id:        m._id,
-      phone:      m.fromPhone,
+      phone:
+        formatPeerDigitsLine(canonicalPeerDigits(m.fromPhone)) ||
+        canonicalPeerDigits(m.fromPhone) ||
+        m.fromPhone,
       message:    m.body || (m.mediaType ? `[${m.mediaType}]` : ''),
       status:     'replied',
       repliedAt:  m.receivedAt,
@@ -124,6 +131,9 @@ router.post('/direct', authenticate, messageLimiter, async (req, res) => {
       return [];
     })();
     const scheduledAt = req.body?.scheduledAt ? new Date(req.body.scheduledAt) : null;
+    const useThrottle =
+      req.body?.throttle !== false &&
+      String(process.env.DIRECT_SEND_THROTTLE || '1') !== '0';
 
     if (!sessionId)          return res.status(400).json({ error: 'sessionId is required' });
     if (phones.length === 0) return res.status(400).json({ error: 'phones[] is required' });
@@ -157,6 +167,26 @@ router.post('/direct', authenticate, messageLimiter, async (req, res) => {
       throw err;
     }
 
+    // Background queue with 10 / 20min throttling (survives navigation; see directSendWorker)
+    if (useThrottle) {
+      const job = await DirectSendJob.create({
+        userId: req.userId,
+        sessionId,
+        phones,
+        message,
+        mediaUrls,
+        status: 'pending',
+      });
+      setImmediate(() => checkDirectJobs().catch(() => {}));
+      return res.json({
+        ok: true,
+        queued: true,
+        jobId: job._id,
+        total: phones.length,
+        throttled: true,
+      });
+    }
+
     const io   = req.app.get('io');
     const room = userRoom(req.userId);
 
@@ -188,6 +218,8 @@ router.post('/direct', authenticate, messageLimiter, async (req, res) => {
             metadata:  { messageId: msgDoc._id, phone, sessionId, mediaCount: mediaUrls.length },
             description: `Message sent to ${phone}`,
           }).catch(() => {});
+
+          await touchLeadLastContactedByPhone(req.userId, phone);
 
           sent++;
         } catch (err) {
@@ -311,6 +343,8 @@ router.post('/send', authenticate, messageLimiter, async (req, res) => {
       console.warn('[messages] post-send charge failed:', err?.message);
       billing = { error: err?.message || 'charge failed' };
     }
+
+    await touchLeadLastContactedByPhone(req.userId, phone);
 
     return res.json({ ok: true, messageId: msgDoc._id, waMessageId, billing });
   } catch (err) {

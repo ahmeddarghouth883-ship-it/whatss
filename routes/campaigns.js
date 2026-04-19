@@ -10,6 +10,7 @@ const Lead      = require('../models/Lead');
 const Message   = require('../models/Message');
 const wallet    = require('../helpers/wallet');
 const { sendMessage } = require('../helpers/whatsappManager');
+const { touchLeadLastContactedByLeadId } = require('../helpers/leadContact');
 
 const router = express.Router();
 
@@ -42,10 +43,14 @@ async function processCampaign(campaignId, io) {
     if (!campaign) return;
 
     const userId = campaign.userId;
-    const leads = await Lead.find({
+    const leadsRaw = await Lead.find({
       _id: { $in: campaign.leadIds },
       userId: campaign.userId,
     }).lean();
+    const orderIdx = new Map(campaign.leadIds.map((id, i) => [String(id), i]));
+    const leads = leadsRaw.sort(
+      (a, b) => (orderIdx.get(String(a._id)) ?? 0) - (orderIdx.get(String(b._id)) ?? 0)
+    );
 
     const delayMs = Math.max(1000, Math.floor(60000 / Math.max(1, campaign.rateLimit || 20)));
 
@@ -121,6 +126,8 @@ async function processCampaign(campaignId, io) {
         console.warn('[campaigns] charge failed:', e?.message);
       }
 
+      await touchLeadLastContactedByLeadId(campaign.userId, lead._id);
+
       campaign.stats.sent = (campaign.stats.sent || 0) + 1;
       campaign.stats.total = leads.length;
       await campaign.save();
@@ -169,12 +176,45 @@ router.post('/', authenticate, async (req, res) => {
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
     if (!message) return res.status(400).json({ error: 'message is required' });
 
-    const filter = { userId: req.userId };
-    if (zone) filter.zone = zone;
-    if (category) filter.category = category;
+    let leadIds;
 
-    const leadDocs = await Lead.find(filter).sort({ createdAt: -1 }).limit(5000).select('_id').lean();
-    const leadIds = leadDocs.map((l) => l._id);
+    const hasExplicitLeadIds = Array.isArray(req.body?.leadIds);
+    if (hasExplicitLeadIds) {
+      if (req.body.leadIds.length === 0) {
+        return res.status(400).json({
+          error: 'leadIds is empty — select at least one lead, or create the campaign without leadIds to use zone/category filters.',
+        });
+      }
+      const requested = [
+        ...new Set(
+          req.body.leadIds
+            .map((id) => String(id || '').trim())
+            .filter((id) => mongoose.isValidObjectId(id))
+        ),
+      ];
+      if (!requested.length) {
+        return res.status(400).json({ error: 'leadIds must contain valid MongoDB ids' });
+      }
+      const oidList = requested.map((id) => new mongoose.Types.ObjectId(id));
+      const found = await Lead.find({
+        userId: req.userId,
+        _id: { $in: oidList },
+      })
+        .select('_id')
+        .lean();
+      const allowed = new Set(found.map((l) => String(l._id)));
+      leadIds = requested.filter((id) => allowed.has(id)).map((id) => new mongoose.Types.ObjectId(id));
+      if (!leadIds.length) {
+        return res.status(400).json({ error: 'None of the given leads belong to your account' });
+      }
+    } else {
+      const filter = { userId: req.userId };
+      if (zone) filter.zone = zone;
+      if (category) filter.category = category;
+
+      const leadDocs = await Lead.find(filter).sort({ createdAt: -1 }).limit(5000).select('_id').lean();
+      leadIds = leadDocs.map((l) => l._id);
+    }
 
     const campaign = await Campaign.create({
       userId:      req.userId,

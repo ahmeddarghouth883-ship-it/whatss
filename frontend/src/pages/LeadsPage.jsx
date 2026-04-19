@@ -36,6 +36,13 @@ function copyPhoneList(phones) {
     .catch(() => toast.error('Copy failed'))
 }
 
+function formatLastMessaged(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+}
+
 // ── Tiny copy icon ────────────────────────────────────────────────────────────
 function CopyIcon() {
   return (
@@ -428,16 +435,16 @@ export default function LeadsPage() {
                     className="rounded"
                   />
                 </th>
-                {['Name', 'Phone', 'Category', 'Zone', 'Rating', 'WA', 'Actions'].map(h => (
+                {['Name', 'Phone', 'Category', 'Zone', 'Rating', 'WA', 'Messaged', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
               ) : leads.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">No leads found</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">No leads found</td></tr>
               ) : leads.map(lead => (
                 <tr key={lead._id} className={`hover:bg-gray-50 transition-colors ${selected.has(lead._id) ? 'bg-green-50' : ''}`}>
                   <td className="px-4 py-3">
@@ -463,6 +470,15 @@ export default function LeadsPage() {
                     {lead.whatsappVerified
                       ? <span className="badge-green text-xs">✓ WA</span>
                       : <span className="badge-gray text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 max-w-[140px]">
+                    {lead.lastContacted ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md" title="Last outbound WhatsApp from this app">
+                        ✉ {formatLastMessaged(lead.lastContacted)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -497,7 +513,7 @@ export default function LeadsPage() {
                 let notesRef = lead.notes || ''
                 return (
                   <tr key={`${editingLead}-edit`} className="bg-yellow-50/40 dark:bg-yellow-900/10 border-b border-yellow-100 dark:border-yellow-900">
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={9} className="px-4 py-3">
                       <div className="flex flex-col gap-2 max-w-2xl">
                         <p className="text-[11px] text-gray-500 uppercase tracking-wide">Edit {lead.name}</p>
                         <input
@@ -571,6 +587,11 @@ export default function LeadsPage() {
                     <span>{lead.zone}</span>
                     {lead.rating && <span>· ★ {lead.rating}</span>}
                   </div>
+                  {lead.lastContacted && (
+                    <p className="text-[11px] text-emerald-700 pl-6 pt-0.5">
+                      ✉ Messaged {formatLastMessaged(lead.lastContacted)}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

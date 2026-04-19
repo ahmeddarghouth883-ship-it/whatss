@@ -35,7 +35,8 @@
     "failed": "فشل",
     "extractingFound": "تم استخراج... {{n}}",
     "savingLeads": "جاري الحفظ... {{saved}}/{{total}}",
-    "runsInBackground": "تعمل العمليات في الخلفية — يمكنك التنقل بحرية"
+    "runsInBackground": "تعمل العمليات في الخلفية — يمكنك التنقل بحرية",
+    "coolingPause": "متوقف حتى {{time}} (حد الإرسال)"
   },
   "dashboard": {
     "greeting": "صباح الخير، {{name}}",

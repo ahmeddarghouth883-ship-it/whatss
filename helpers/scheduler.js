@@ -6,7 +6,9 @@
 const ScheduledMessage = require('../models/ScheduledMessage');
 const Message          = require('../models/Message');
 const wallet           = require('./wallet');
+const { touchLeadLastContactedByPhone } = require('./leadContact');
 const { sendMessage, getClient } = require('./whatsappManager');
+const { checkDirectJobs } = require('./directSendWorker');
 
 const COST = wallet.CREDIT_COSTS.message;
 
@@ -73,6 +75,8 @@ async function fireScheduled(job) {
         description: `Scheduled message to ${phone}`,
       }).catch(() => {});
 
+      await touchLeadLastContactedByPhone(job.userId, phone);
+
       sent++;
     } catch (err) {
       failed++;
@@ -108,9 +112,13 @@ async function checkScheduled() {
 
 function startScheduler(ioInstance) {
   io = ioInstance;
-  setInterval(checkScheduled, 30_000);
-  checkScheduled();
-  console.log('[scheduler] Started — checking every 30s');
+  const tick = () => {
+    checkScheduled().catch((e) => console.warn('[scheduler] poll:', e.message));
+    checkDirectJobs().catch((e) => console.warn('[directSendWorker] tick:', e.message));
+  };
+  setInterval(tick, 30_000);
+  tick();
+  console.log('[scheduler] Started — scheduled messages + direct queue every 30s');
 }
 
 module.exports = { startScheduler };

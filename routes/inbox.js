@@ -17,6 +17,11 @@ const Message            = require('../models/Message');
 const Lead               = require('../models/Lead');
 const wallet             = require('../helpers/wallet');
 const { sendMessage, getClient, getAllClients } = require('../helpers/whatsappManager');
+const {
+  canonicalPeerDigits,
+  expandPeerQueryVariants,
+  formatPeerDigitsLine,
+} = require('../helpers/waIdentity');
 
 const router = express.Router();
 router.use(authenticate);
@@ -95,25 +100,35 @@ router.get('/threads', async (req, res) => {
           },
         },
       ]);
-      for (const r of outboundAgg) outboundByPhone.set(r._id, r);
+      for (const r of outboundAgg) {
+        outboundByPhone.set(r._id, r);
+        outboundByPhone.set(canonicalPeerDigits(r._id), r);
+      }
     }
 
     // Lead lookup for names
     const leadByPhone = new Map();
     if (phones.length > 0) {
-      const leads = await Lead.find({
-        userId: req.userId, phone: { $in: phones },
+      const canonicalForLead = [...new Set(phones.map((p) => canonicalPeerDigits(p)).filter(Boolean))];
+    const leads = await Lead.find({
+        userId: req.userId,
+        phone: { $in: [...canonicalForLead, ...phones] },
       }).select('phone name _id').lean();
-      for (const l of leads) leadByPhone.set(l.phone, l);
+      for (const l of leads) {
+        leadByPhone.set(l.phone, l);
+        leadByPhone.set(canonicalPeerDigits(l.phone), l);
+      }
     }
 
     const threads = inboundAgg.map((t) => {
-      const out = outboundByPhone.get(t._id);
-      const lead = leadByPhone.get(t._id);
+      const peerKey = canonicalPeerDigits(t._id);
+      const out = outboundByPhone.get(t._id) || outboundByPhone.get(peerKey);
+      const lead = leadByPhone.get(t._id) || leadByPhone.get(peerKey);
       const lastFromOut = out && (!t.lastAt || (out.lastAt && out.lastAt > t.lastAt));
       return {
-        phone:        t._id,
+        phone:        peerKey || t._id,
         contactName:  lead?.name || t.contactName || '',
+        displayPhone: formatPeerDigitsLine(peerKey),
         leadId:       lead?._id || null,
         leadName:     lead?.name || null,
         lastMessage:  lastFromOut
@@ -142,12 +157,21 @@ router.get('/threads/:phone', async (req, res) => {
     if (!phone) return res.status(400).json({ error: 'phone is required' });
     const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
 
+    const peerVariants = expandPeerQueryVariants(phone);
+    const digitKey = canonicalPeerDigits(phone);
+
     const [inbound, outbound, lead] = await Promise.all([
-      InboundMessage.find({ userId: req.userId, fromPhone: phone })
+      InboundMessage.find({ userId: req.userId, fromPhone: { $in: peerVariants } })
         .sort({ receivedAt: -1 }).limit(limit).lean(),
-      Message.find({ userId: req.userId, phone })
+      Message.find({
+        userId: req.userId,
+        phone: { $in: [...new Set([digitKey, phone].filter(Boolean))] },
+      })
         .sort({ createdAt: -1 }).limit(limit).lean(),
-      Lead.findOne({ userId: req.userId, phone }).select('name _id email category').lean(),
+      Lead.findOne({
+        userId: req.userId,
+        phone: { $in: [...new Set([digitKey, phone].filter(Boolean))] },
+      }).select('name _id email category').lean(),
     ]);
 
     const items = [
@@ -176,7 +200,13 @@ router.get('/threads/:phone', async (req, res) => {
       lead?.name ||
       inbound.find((m) => m.contactName)?.contactName || '';
 
-    return res.json({ phone, contactName, lead, items });
+    return res.json({
+      phone: digitKey || phone,
+      contactName,
+      displayPhone: formatPeerDigitsLine(digitKey || phone),
+      lead,
+      items,
+    });
   } catch (err) {
     console.error('[inbox/thread]', err);
     return res.status(500).json({ error: err.message });
@@ -189,8 +219,9 @@ router.post('/threads/:phone/read', async (req, res) => {
     const phone = String(req.params.phone || '').trim();
     if (!phone) return res.status(400).json({ error: 'phone is required' });
 
+    const peerVariants = expandPeerQueryVariants(phone);
     const r = await InboundMessage.updateMany(
-      { userId: req.userId, fromPhone: phone, read: false },
+      { userId: req.userId, fromPhone: { $in: peerVariants }, read: false },
       { $set: { read: true, readAt: new Date() } },
     );
     return res.json({ ok: true, updated: r.modifiedCount });
@@ -202,12 +233,13 @@ router.post('/threads/:phone/read', async (req, res) => {
 // ── POST /threads/:phone/reply ─────────────────────────────────────────────
 router.post('/threads/:phone/reply', messageLimiter, async (req, res) => {
   try {
-    const phone     = String(req.params.phone || '').trim();
+    const phoneParam = String(req.params.phone || '').trim();
+    const digitPhone   = canonicalPeerDigits(phoneParam) || phoneParam;
     const message   = String(req.body?.message || '').trim();
     const mediaUrl  = req.body?.mediaUrl ? String(req.body.mediaUrl) : null;
     let   sessionId = String(req.body?.sessionId || '').trim();
 
-    if (!phone)   return res.status(400).json({ error: 'phone is required' });
+    if (!phoneParam) return res.status(400).json({ error: 'phone is required' });
     if (!message && !mediaUrl) return res.status(400).json({ error: 'message or mediaUrl is required' });
 
     if (!sessionId) sessionId = pickFirstReadySession();
@@ -229,10 +261,10 @@ router.post('/threads/:phone/reply', messageLimiter, async (req, res) => {
 
     let waMessageId;
     try {
-      waMessageId = await sendMessage(sessionId, phone, message, mediaUrl);
+      waMessageId = await sendMessage(sessionId, digitPhone, message, mediaUrl);
     } catch (err) {
       await Message.create({
-        userId: req.userId, sessionId, phone, message, mediaUrl,
+        userId: req.userId, sessionId, phone: digitPhone, message, mediaUrl,
         status: 'failed',
         failReason: String(err?.message || 'send failed').slice(0, 400),
       }).catch(() => {});
@@ -240,7 +272,7 @@ router.post('/threads/:phone/reply', messageLimiter, async (req, res) => {
     }
 
     const msgDoc = await Message.create({
-      userId: req.userId, sessionId, phone, message, mediaUrl,
+      userId: req.userId, sessionId, phone: digitPhone, message, mediaUrl,
       status: 'sent', waMessageId, sentAt: new Date(),
     });
 
@@ -250,13 +282,13 @@ router.post('/threads/:phone/reply', messageLimiter, async (req, res) => {
       cost:        COST,
       source:      'message',
       reference,
-      metadata:    { messageId: msgDoc._id, waMessageId, phone, sessionId, source: 'inbox' },
-      description: `Inbox reply to ${phone}`,
+      metadata:    { messageId: msgDoc._id, waMessageId, phone: digitPhone, sessionId, source: 'inbox' },
+      description: `Inbox reply to ${digitPhone}`,
     }).catch((e) => console.warn('[inbox/reply] charge:', e.message));
 
     // Auto-mark inbound as read when the user replies
     await InboundMessage.updateMany(
-      { userId: req.userId, fromPhone: phone, read: false },
+      { userId: req.userId, fromPhone: { $in: expandPeerQueryVariants(phoneParam) }, read: false },
       { $set: { read: true, readAt: new Date() } },
     ).catch(() => {});
 

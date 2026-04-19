@@ -35,7 +35,8 @@
     "failed": "failed",
     "extractingFound": "Extracting… {{n}} found",
     "savingLeads": "Saving… {{saved}}/{{total}}",
-    "runsInBackground": "Runs in background — safe to navigate"
+    "runsInBackground": "Runs in background — safe to navigate",
+    "coolingPause": "Paused until {{time}} (rate limit)"
   },
   "dashboard": {
     "greeting": "Good morning, {{name}}",

@@ -33,7 +33,24 @@ export default function Layout() {
 
   // ── Global Socket.IO listeners ──────────────────────────────────────────────
   useEffect(() => {
-    const onDirectProgress = d => setActiveSend({ sent: d.sent, failed: d.failed, total: d.total })
+    const onDirectProgress = d =>
+      setActiveSend(s => ({
+        ...(s && s.label ? { label: s.label } : {}),
+        sent: d.sent,
+        failed: d.failed,
+        total: d.total,
+        cooling: !!d.cooling,
+        nextResumeAt: d.nextResumeAt || null,
+      }))
+    const onDirectCooling = d =>
+      setActiveSend(s => ({
+        ...(s && s.label ? { label: s.label } : {}),
+        sent: d.sent,
+        failed: d.failed,
+        total: d.total,
+        cooling: true,
+        nextResumeAt: d.nextResumeAt || null,
+      }))
     const onDirectDone     = d => {
       setActiveSend(null)
       // Brief done flash handled via toast in ComposePage
@@ -50,6 +67,7 @@ export default function Layout() {
     const onCampaignPause  = _d => setActiveSend(null)
 
     socket.on('direct:progress',  onDirectProgress)
+    socket.on('direct:cooling',   onDirectCooling)
     socket.on('direct:done',      onDirectDone)
     socket.on('scrape:started',   onScrapeStarted)
     socket.on('scrape:found',     onScrapeFound)
@@ -64,6 +82,7 @@ export default function Layout() {
 
     return () => {
       socket.off('direct:progress',  onDirectProgress)
+      socket.off('direct:cooling',   onDirectCooling)
       socket.off('direct:done',      onDirectDone)
       socket.off('scrape:started',   onScrapeStarted)
       socket.off('scrape:found',     onScrapeFound)
@@ -250,11 +269,28 @@ export default function Layout() {
               <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full flex-shrink-0" />
               {activeSend && (
                 <span className="truncate">
-                  {activeSend.label
-                    ? `📨 ${t('layout.sendingCampaign')} "${activeSend.label}"`
-                    : `📨 ${t('layout.sendingMessages')}`}
-                  {' — '}{activeSend.sent}/{activeSend.total} {t('layout.sent')}
-                  {activeSend.failed > 0 && ` · ${activeSend.failed} ${t('layout.failed')}`}
+                  {activeSend.cooling && activeSend.nextResumeAt ? (
+                    <>
+                      ⏸{' '}
+                      {t('layout.coolingPause', {
+                        time: new Date(activeSend.nextResumeAt).toLocaleString(),
+                      })}
+                      {' · '}
+                      {activeSend.sent}/{activeSend.total} {t('layout.sent')}
+                      {activeSend.failed > 0 &&
+                        ` · ${activeSend.failed} ${t('layout.failed')}`}
+                    </>
+                  ) : (
+                    <>
+                      {activeSend.label
+                        ? `📨 ${t('layout.sendingCampaign')} "${activeSend.label}"`
+                        : `📨 ${t('layout.sendingMessages')}`}
+                      {' — '}
+                      {activeSend.sent}/{activeSend.total} {t('layout.sent')}
+                      {activeSend.failed > 0 &&
+                        ` · ${activeSend.failed} ${t('layout.failed')}`}
+                    </>
+                  )}
                 </span>
               )}
               {activeScrape && !activeSend && (

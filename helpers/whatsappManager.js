@@ -3,6 +3,7 @@ const qrcode    = require('qrcode');
 const path      = require('path');
 const fs        = require('fs');
 const WASession = require('../models/WASession');
+const { resolveInboundSender, canonicalPeerDigits } = require('./waIdentity');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
@@ -156,14 +157,18 @@ async function createClient(sessionId, userId, io) {
     if (!msg || !msg.from || msg.from === 'status@broadcast') return;
     if (String(msg.from).endsWith('@g.us')) return;
 
-    const phone = msg.from.replace('@c.us', '');
-    const body  = msg.body || '';
+    const body = msg.body || '';
 
+    let phone = '';
     let contactName = '';
     try {
-      const contact = await msg.getContact();
-      contactName = contact?.pushname || contact?.name || contact?.shortName || '';
-    } catch (_) { /* ignore */ }
+      const resolved = await resolveInboundSender(msg);
+      phone = resolved.threadPhone;
+      contactName = resolved.contactName || '';
+    } catch (e) {
+      console.warn('[wa/message] resolveInboundSender:', e.message);
+      phone = canonicalPeerDigits(msg.from) || 'unknown';
+    }
 
     let mediaUrl = null;
     let mediaType = null;

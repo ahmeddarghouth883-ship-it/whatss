@@ -8,11 +8,9 @@ const DirectSendJob = require('../models/DirectSendJob');
 const wallet = require('./wallet');
 const { touchLeadLastContactedByPhone } = require('./leadContact');
 const { sendMessage, getClient } = require('./whatsappManager');
+const { BATCH_SIZE, BREAK_MS } = require('./sendBatchConfig');
 
 const COST = wallet.CREDIT_COSTS.message;
-
-const BATCH_SIZE = Math.max(1, Math.min(100, Number(process.env.DIRECT_SEND_BATCH) || 10));
-const BREAK_MS = Math.max(60_000, Number(process.env.DIRECT_SEND_BREAK_MS) || 20 * 60 * 1000);
 
 let io;
 

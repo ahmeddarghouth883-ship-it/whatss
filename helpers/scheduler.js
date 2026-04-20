@@ -9,6 +9,7 @@ const wallet           = require('./wallet');
 const { touchLeadLastContactedByPhone } = require('./leadContact');
 const { sendMessage, getClient } = require('./whatsappManager');
 const { checkDirectJobs } = require('./directSendWorker');
+const { BATCH_SIZE, BREAK_MS } = require('./sendBatchConfig');
 
 const COST = wallet.CREDIT_COSTS.message;
 
@@ -46,48 +47,67 @@ async function fireScheduled(job) {
   let sent = 0;
   let failed = 0;
   const room = userRoom(job.userId);
+  const phones = job.phones || [];
 
-  for (const phone of job.phones) {
-    try { await wallet.ensureCredits(job.userId, COST); }
-    catch (_) {
-      failed += job.phones.length - sent - failed;
-      break;
-    }
+  sched: for (let start = 0; start < phones.length; start += BATCH_SIZE) {
+    const end = Math.min(start + BATCH_SIZE, phones.length);
 
-    try {
-      await sendMediaBatch(job.sessionId, phone, job.message, job.mediaUrls);
+    for (let i = start; i < end; i++) {
+      const phone = phones[i];
+      try {
+        await wallet.ensureCredits(job.userId, COST);
+      } catch (_) {
+        failed += phones.length - sent - failed;
+        break sched;
+      }
 
-      const msgDoc = await Message.create({
-        userId:   job.userId,
-        sessionId: job.sessionId,
-        phone,
-        message:  job.message || '',
-        status:   'sent',
-        sentAt:   new Date(),
+      try {
+        await sendMediaBatch(job.sessionId, phone, job.message, job.mediaUrls);
+
+        const msgDoc = await Message.create({
+          userId: job.userId,
+          sessionId: job.sessionId,
+          phone,
+          message: job.message || '',
+          status: 'sent',
+          sentAt: new Date(),
+        });
+
+        await wallet.charge({
+          userId: job.userId,
+          cost: COST,
+          source: 'message',
+          reference: `sched-msg:${job._id}:${phone}`,
+          metadata: { scheduledMessageId: job._id, messageId: msgDoc._id, phone },
+          description: `Scheduled message to ${phone}`,
+        }).catch(() => {});
+
+        await touchLeadLastContactedByPhone(job.userId, phone);
+
+        sent++;
+      } catch (err) {
+        failed++;
+        await Message.create({
+          userId: job.userId,
+          sessionId: job.sessionId,
+          phone,
+          message: job.message || '',
+          status: 'failed',
+          failReason: String(err?.message || err).slice(0, 400),
+        }).catch(() => {});
+      }
+
+      io?.to(room).emit('direct:progress', {
+        sent,
+        failed,
+        total: phones.length,
+        scheduled: true,
       });
-
-      await wallet.charge({
-        userId:      job.userId,
-        cost:        COST,
-        source:      'message',
-        reference:   `sched-msg:${job._id}:${phone}`,
-        metadata:    { scheduledMessageId: job._id, messageId: msgDoc._id, phone },
-        description: `Scheduled message to ${phone}`,
-      }).catch(() => {});
-
-      await touchLeadLastContactedByPhone(job.userId, phone);
-
-      sent++;
-    } catch (err) {
-      failed++;
-      await Message.create({
-        userId: job.userId, sessionId: job.sessionId, phone,
-        message: job.message || '', status: 'failed',
-        failReason: String(err?.message || err).slice(0, 400),
-      }).catch(() => {});
     }
 
-    io?.to(room).emit('direct:progress', { sent, failed, total: job.phones.length, scheduled: true });
+    if (end < phones.length) {
+      await new Promise((r) => setTimeout(r, BREAK_MS));
+    }
   }
 
   await ScheduledMessage.updateOne({ _id: job._id }, {

@@ -11,6 +11,7 @@ const Message   = require('../models/Message');
 const wallet    = require('../helpers/wallet');
 const { sendMessage } = require('../helpers/whatsappManager');
 const { touchLeadLastContactedByLeadId } = require('../helpers/leadContact');
+const { BATCH_SIZE, BREAK_MS } = require('../helpers/sendBatchConfig');
 
 const router = express.Router();
 
@@ -67,38 +68,60 @@ async function processCampaign(campaignId, io) {
       (a, b) => (orderIdx.get(String(a._id)) ?? 0) - (orderIdx.get(String(b._id)) ?? 0)
     );
 
-    const delayMs = Math.max(1000, Math.floor(60000 / Math.max(1, campaign.rateLimit || 20)));
-
-    for (let i = 0; i < leads.length; i++) {
+    let idx = 0;
+    outer: while (idx < leads.length) {
       campaign = await Campaign.findById(campaignId);
       if (!campaign || campaign.status === 'paused') break;
       if (campaign.status !== 'running') break;
 
-      const lead = leads[i];
-      const text = personalize(campaign.message, lead);
+      const chunkEnd = Math.min(idx + BATCH_SIZE, leads.length);
 
-      try {
-        await wallet.ensureCredits(userId, COST);
-      } catch (e) {
-        if (e?.code === 'INSUFFICIENT_CREDITS') {
-          campaign.status = 'paused';
-          await campaign.save();
-          io.to(roomForUser(userId)).emit('campaign:error', { campaignId: id, error: 'INSUFFICIENT_CREDITS' });
-          break;
+      for (let i = idx; i < chunkEnd; i++) {
+        campaign = await Campaign.findById(campaignId);
+        if (!campaign || campaign.status === 'paused') break outer;
+        if (campaign.status !== 'running') break outer;
+
+        const lead = leads[i];
+        const text = personalize(campaign.message, lead);
+
+        try {
+          await wallet.ensureCredits(userId, COST);
+        } catch (e) {
+          if (e?.code === 'INSUFFICIENT_CREDITS') {
+            campaign.status = 'paused';
+            await campaign.save();
+            io.to(roomForUser(userId)).emit('campaign:error', { campaignId: id, error: 'INSUFFICIENT_CREDITS' });
+            break outer;
+          }
+          throw e;
         }
-        throw e;
-      }
 
-      let waMessageId;
-      try {
-        waMessageId = await sendMessage(
-          campaign.sessionId,
-          lead.phone,
-          text,
-          campaign.mediaUrl || null
-        );
-      } catch (err) {
-        await Message.create({
+        let waMessageId;
+        try {
+          waMessageId = await sendMessage(
+            campaign.sessionId,
+            lead.phone,
+            text,
+            campaign.mediaUrl || null
+          );
+        } catch (err) {
+          await Message.create({
+            userId:     campaign.userId,
+            campaignId: campaign._id,
+            leadId:     lead._id,
+            sessionId:  campaign.sessionId,
+            phone:      lead.phone,
+            message:    text,
+            mediaUrl:   campaign.mediaUrl,
+            status:     'failed',
+            failReason: String(err?.message || err).slice(0, 400),
+          });
+          campaign.stats.failed = (campaign.stats.failed || 0) + 1;
+          await campaign.save();
+          continue;
+        }
+
+        const msgDoc = await Message.create({
           userId:     campaign.userId,
           campaignId: campaign._id,
           leadId:     lead._id,
@@ -106,49 +129,41 @@ async function processCampaign(campaignId, io) {
           phone:      lead.phone,
           message:    text,
           mediaUrl:   campaign.mediaUrl,
-          status:     'failed',
-          failReason: String(err?.message || err).slice(0, 400),
+          status:     'sent',
+          waMessageId,
+          sentAt:     new Date(),
         });
-        campaign.stats.failed = (campaign.stats.failed || 0) + 1;
+
+        const reference = `msg:${waMessageId || msgDoc._id}`;
+        try {
+          await wallet.charge({
+            userId:      campaign.userId,
+            cost:        COST,
+            source:      'message',
+            reference,
+            metadata:    { campaignId: campaign._id, messageId: msgDoc._id, phone: lead.phone },
+            description: `Campaign message to ${lead.phone}`,
+          });
+        } catch (e) {
+          console.warn('[campaigns] charge failed:', e?.message);
+        }
+
+        await touchLeadLastContactedByLeadId(campaign.userId, lead._id);
+
+        campaign.stats.sent = (campaign.stats.sent || 0) + 1;
+        campaign.stats.total = leads.length;
         await campaign.save();
-        continue;
+        io.to(roomForUser(userId)).emit('campaign:progress', { campaignId: id, sent: campaign.stats.sent });
       }
 
-      const msgDoc = await Message.create({
-        userId:     campaign.userId,
-        campaignId: campaign._id,
-        leadId:     lead._id,
-        sessionId:  campaign.sessionId,
-        phone:      lead.phone,
-        message:    text,
-        mediaUrl:   campaign.mediaUrl,
-        status:     'sent',
-        waMessageId,
-        sentAt:     new Date(),
-      });
+      idx = chunkEnd;
+      if (idx >= leads.length) break;
 
-      const reference = `msg:${waMessageId || msgDoc._id}`;
-      try {
-        await wallet.charge({
-          userId:      campaign.userId,
-          cost:        COST,
-          source:      'message',
-          reference,
-          metadata:    { campaignId: campaign._id, messageId: msgDoc._id, phone: lead.phone },
-          description: `Campaign message to ${lead.phone}`,
-        });
-      } catch (e) {
-        console.warn('[campaigns] charge failed:', e?.message);
-      }
+      campaign = await Campaign.findById(campaignId);
+      if (!campaign || campaign.status === 'paused') break;
+      if (campaign.status !== 'running') break;
 
-      await touchLeadLastContactedByLeadId(campaign.userId, lead._id);
-
-      campaign.stats.sent = (campaign.stats.sent || 0) + 1;
-      campaign.stats.total = leads.length;
-      await campaign.save();
-      io.to(roomForUser(userId)).emit('campaign:progress', { campaignId: id, sent: campaign.stats.sent });
-
-      await new Promise((r) => setTimeout(r, delayMs));
+      await new Promise((r) => setTimeout(r, BREAK_MS));
     }
 
     campaign = await Campaign.findById(campaignId);

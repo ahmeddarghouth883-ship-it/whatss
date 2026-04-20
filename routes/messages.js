@@ -28,22 +28,6 @@ const router = express.Router();
 
 const COST = wallet.CREDIT_COSTS.message;
 
-function userRoom(userId) {
-  return `user:${String(userId)}`;
-}
-
-// Helper: send text + multiple media files to a single phone
-async function sendMediaBatch(sessionId, phone, text, mediaUrls) {
-  if (!mediaUrls || mediaUrls.length === 0) {
-    await sendMessage(sessionId, phone, text, null);
-    return;
-  }
-  await sendMessage(sessionId, phone, text || '', mediaUrls[0]);
-  for (let i = 1; i < mediaUrls.length; i++) {
-    await sendMessage(sessionId, phone, '', mediaUrls[i]);
-  }
-}
-
 // ── GET /replies (legacy inbox) — now backed by InboundMessage so the body is real ──
 router.get('/replies', authenticate, async (req, res) => {
   try {
@@ -131,9 +115,6 @@ router.post('/direct', authenticate, messageLimiter, async (req, res) => {
       return [];
     })();
     const scheduledAt = req.body?.scheduledAt ? new Date(req.body.scheduledAt) : null;
-    const useThrottle =
-      req.body?.throttle !== false &&
-      String(process.env.DIRECT_SEND_THROTTLE || '1') !== '0';
 
     if (!sessionId)          return res.status(400).json({ error: 'sessionId is required' });
     if (phones.length === 0) return res.status(400).json({ error: 'phones[] is required' });
@@ -167,77 +148,23 @@ router.post('/direct', authenticate, messageLimiter, async (req, res) => {
       throw err;
     }
 
-    // Background queue with 10 / 20min throttling (survives navigation; see directSendWorker)
-    if (useThrottle) {
-      const job = await DirectSendJob.create({
-        userId: req.userId,
-        sessionId,
-        phones,
-        message,
-        mediaUrls,
-        status: 'pending',
-      });
-      setImmediate(() => checkDirectJobs().catch(() => {}));
-      return res.json({
-        ok: true,
-        queued: true,
-        jobId: job._id,
-        total: phones.length,
-        throttled: true,
-      });
-    }
-
-    const io   = req.app.get('io');
-    const room = userRoom(req.userId);
-
-    setImmediate(async () => {
-      let sent = 0;
-      let failed = 0;
-
-      for (const phone of phones) {
-        try {
-          await wallet.ensureCredits(req.userId, COST);
-        } catch (_) {
-          failed += phones.length - sent - failed;
-          io?.to(room).emit('direct:progress', { sent, failed, total: phones.length });
-          io?.to(room).emit('direct:done', { sent, failed, total: phones.length, stopped: 'INSUFFICIENT_CREDITS' });
-          return;
-        }
-
-        try {
-          await sendMediaBatch(sessionId, phone, message, mediaUrls);
-
-          const msgDoc = await Message.create({
-            userId: req.userId, sessionId, phone, message,
-            mediaUrl: mediaUrls[0] || null, status: 'sent', sentAt: new Date(),
-          });
-
-          await wallet.charge({
-            userId: req.userId, cost: COST, source: 'message',
-            reference: `msg:direct:${phone}:${Date.now()}`,
-            metadata:  { messageId: msgDoc._id, phone, sessionId, mediaCount: mediaUrls.length },
-            description: `Message sent to ${phone}`,
-          }).catch(() => {});
-
-          await touchLeadLastContactedByPhone(req.userId, phone);
-
-          sent++;
-        } catch (err) {
-          failed++;
-          await Message.create({
-            userId: req.userId, sessionId, phone, message,
-            mediaUrl: mediaUrls[0] || null, status: 'failed',
-            failReason: String(err?.message || 'send failed').slice(0, 400),
-          }).catch(() => {});
-        }
-
-        io?.to(room).emit('direct:progress', { sent, failed, total: phones.length });
-      }
-
-      io?.to(room).emit('direct:done', { sent, failed, total: phones.length });
+    // Background queue: batch + cooldown (same as campaigns & schedule; see directSendWorker + sendBatchConfig)
+    const job = await DirectSendJob.create({
+      userId: req.userId,
+      sessionId,
+      phones,
+      message,
+      mediaUrls,
+      status: 'pending',
     });
-
-    return res.json({ ok: true, queued: true, total: phones.length });
+    setImmediate(() => checkDirectJobs().catch(() => {}));
+    return res.json({
+      ok: true,
+      queued: true,
+      jobId: job._id,
+      total: phones.length,
+      throttled: true,
+    });
   } catch (err) {
     console.error('[messages/direct]', err);
     return res.status(500).json({ error: err.message });

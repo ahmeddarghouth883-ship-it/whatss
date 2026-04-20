@@ -3,6 +3,7 @@ import api from '../api/client'
 
 let cachedKeyPromise = null
 let cachedScriptPromise = null
+let cachedLibrariesPromise = null
 
 async function fetchMapsKey() {
   if (!cachedKeyPromise) {
@@ -13,7 +14,7 @@ async function fetchMapsKey() {
 
 function loadScript(key, libraries = ['places']) {
   if (typeof window === 'undefined') return Promise.reject(new Error('No window'))
-  if (window.google?.maps?.places) return Promise.resolve(window.google)
+  if (window.google?.maps) return Promise.resolve(window.google)
   if (cachedScriptPromise) return cachedScriptPromise
 
   cachedScriptPromise = new Promise((resolve, reject) => {
@@ -39,6 +40,22 @@ function loadScript(key, libraries = ['places']) {
   return cachedScriptPromise
 }
 
+async function ensureLibraries(googleObj, libraries = ['places']) {
+  if (!googleObj?.maps) throw new Error('Google Maps namespace unavailable')
+  if (cachedLibrariesPromise) return cachedLibrariesPromise
+  if (typeof googleObj.maps.importLibrary !== 'function') return googleObj
+
+  const unique = Array.from(new Set(['maps', ...libraries, 'visualization']))
+  cachedLibrariesPromise = Promise.all(unique.map((lib) => googleObj.maps.importLibrary(lib)))
+    .then(() => googleObj)
+    .catch((err) => {
+      cachedLibrariesPromise = null
+      throw err
+    })
+
+  return cachedLibrariesPromise
+}
+
 /**
  * useGoogleMaps — loads the Google Maps JS API once and returns { google, ready, error }.
  * The API key is fetched from the authenticated /api/config/maps-key endpoint,
@@ -46,7 +63,7 @@ function loadScript(key, libraries = ['places']) {
  */
 export function useGoogleMaps(libraries = ['places']) {
   const [google, setGoogle] = useState(typeof window !== 'undefined' ? window.google || null : null)
-  const [ready, setReady]   = useState(!!(typeof window !== 'undefined' && window.google?.maps?.places))
+  const [ready, setReady]   = useState(!!(typeof window !== 'undefined' && window.google?.maps?.Map))
   const [error, setError]   = useState(null)
 
   useEffect(() => {
@@ -56,9 +73,10 @@ export function useGoogleMaps(libraries = ['places']) {
         const key = await fetchMapsKey()
         if (!key) throw new Error('Google Maps key unavailable. Check server env/logs.')
         const g = await loadScript(key, libraries)
+        await ensureLibraries(g, libraries)
         if (cancelled) return
         setGoogle(g)
-        setReady(true)
+        setReady(!!g?.maps?.Map)
       } catch (e) {
         if (!cancelled) setError(e.message || 'Failed to load Google Maps')
       }

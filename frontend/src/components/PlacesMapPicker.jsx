@@ -185,7 +185,16 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
   async function loadHeatmap() {
     const g = google || window.google
     const map = mapRef.current
-    if (!g || !map || !g.maps?.visualization) return
+    if (!g || !map) return
+    if (!g.maps?.visualization && typeof g.maps?.importLibrary === 'function') {
+      try {
+        await g.maps.importLibrary('visualization')
+      } catch (_) {
+        // Visualization is optional; keep map usable even if unavailable.
+        return
+      }
+    }
+    if (!g.maps?.visualization) return
     if (heatmapRef.current) {
       heatmapRef.current.setMap(null)
       heatmapRef.current = null

@@ -43,7 +43,7 @@ function loadScript(key, libraries = ['places']) {
     s.id = 'google-maps-js'
     s.async = true
     s.defer = true
-    const libs = Array.from(new Set([...libraries, 'visualization'])).join(',')
+    const libs = Array.from(new Set(libraries)).join(',')
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=${libs}&v=weekly&loading=async`
     s.onload = () => {
       s.dataset.loaded = 'true'
@@ -63,7 +63,7 @@ async function ensureLibraries(googleObj, libraries = ['places']) {
   if (cachedLibrariesPromise) return cachedLibrariesPromise
   if (typeof googleObj.maps.importLibrary !== 'function') return googleObj
 
-  const unique = Array.from(new Set(['maps', ...libraries, 'visualization']))
+  const unique = Array.from(new Set(['maps', ...libraries]))
   cachedLibrariesPromise = Promise.all(unique.map((lib) => googleObj.maps.importLibrary(lib)))
     .then(() => googleObj)
     .catch((err) => {

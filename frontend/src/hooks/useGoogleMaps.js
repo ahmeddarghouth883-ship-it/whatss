@@ -5,6 +5,23 @@ let cachedKeyPromise = null
 let cachedScriptPromise = null
 const cachedLibrariesPromises = new Map()
 
+function waitForGoogleMaps(timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      if (window.google?.maps) {
+        window.clearInterval(timer)
+        resolve(window.google)
+        return
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        window.clearInterval(timer)
+        reject(new Error('Timed out waiting for Google Maps namespace'))
+      }
+    }, 50)
+  })
+}
+
 async function fetchMapsKey() {
   if (!cachedKeyPromise) {
     cachedKeyPromise = api
@@ -34,21 +51,34 @@ function loadScript(key, libraries = ['places']) {
       // Existing script may already be finished (success or failure), so don't
       // rely only on future load/error events.
       const existingSrc = existing.getAttribute('src') || ''
-      if (/maps\.googleapis\.com\/maps\/api\/js/.test(existingSrc) && existing.dataset.loaded === 'true') {
-        if (window.google?.maps) {
-          resolve(window.google)
-          return
-        }
-        // Previous script load looked successful but namespace is missing.
-        // Remove and recreate script to recover from partial-load edge cases.
+      const isMapsScript = /maps\.googleapis\.com\/maps\/api\/js/.test(existingSrc)
+      if (isMapsScript && (existing.dataset.loaded === 'true' || existing.readyState === 'complete')) {
+        // If the event already fired before we subscribed, explicitly wait for the namespace.
+        waitForGoogleMaps()
+          .then(resolve)
+          .catch((err) => {
+            existing.remove()
+            cachedScriptPromise = null
+            reject(err)
+          })
+        return
+      }
+      if (!isMapsScript) {
         existing.remove()
         cachedScriptPromise = null
       } else {
-        existing.addEventListener('load', () => resolve(window.google))
+        existing.addEventListener('load', () => {
+          waitForGoogleMaps()
+            .then(resolve)
+            .catch((err) => {
+              cachedScriptPromise = null
+              reject(err)
+            })
+        }, { once: true })
         existing.addEventListener('error', () => {
           cachedScriptPromise = null
           reject(new Error('Failed to load Google Maps JS'))
-        })
+        }, { once: true })
         return
       }
     }
@@ -60,7 +90,12 @@ function loadScript(key, libraries = ['places']) {
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=${libs}&v=weekly&loading=async`
     s.onload = () => {
       s.dataset.loaded = 'true'
-      resolve(window.google)
+      waitForGoogleMaps()
+        .then(resolve)
+        .catch((err) => {
+          cachedScriptPromise = null
+          reject(err)
+        })
     }
     s.onerror = () => {
       cachedScriptPromise = null

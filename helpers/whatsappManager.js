@@ -49,7 +49,14 @@ function buildPuppeteerOptions() {
     }
   }
 
-  const opts = { headless: true, args };
+  const protocolTimeoutMs = Number(process.env.PUPPETEER_PROTOCOL_TIMEOUT_MS || 180000);
+  const launchTimeoutMs = Number(process.env.PUPPETEER_LAUNCH_TIMEOUT_MS || 180000);
+  const opts = {
+    headless: true,
+    args,
+    protocolTimeout: Number.isFinite(protocolTimeoutMs) ? protocolTimeoutMs : 180000,
+    timeout: Number.isFinite(launchTimeoutMs) ? launchTimeoutMs : 180000,
+  };
 
   if (execPath) {
     if (!fs.existsSync(execPath)) {

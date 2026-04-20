@@ -28,7 +28,7 @@ function loadScript(key, libraries = ['places']) {
     s.async = true
     s.defer = true
     const libs = Array.from(new Set([...libraries, 'visualization'])).join(',')
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=${libs}&v=weekly`
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=${libs}&v=weekly&loading=async`
     s.onload = () => resolve(window.google)
     s.onerror = () => {
       cachedScriptPromise = null

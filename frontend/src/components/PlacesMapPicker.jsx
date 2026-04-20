@@ -19,14 +19,17 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
   const { google, ready, error } = useGoogleMaps(['places'])
   const mapDivRef     = useRef(null)
   const searchInputRef = useRef(null)
+  const searchControlRef = useRef(null)
   const mapRef        = useRef(null)
   const markerRef     = useRef(null)
   const circleRef     = useRef(null)
   const autocompleteRef = useRef(null)
   const geocoderRef   = useRef(null)
 
-  const [center, setCenter] = useState(() => (value?.lat && value?.lng ? { lat: value.lat, lng: value.lng } : null))
-  const [radius, setRadius] = useState(value?.radius || 2500)
+  const [center, setCenter] = useState(() => (
+    value?.lat != null && value?.lng != null ? { lat: value.lat, lng: value.lng } : null
+  ))
+  const [radius, setRadius] = useState(value?.radius ?? 2500)
   const [address, setAddress] = useState(value?.address || '')
   const [showHeatmap, setShowHeatmap] = useState(false)
   const heatmapRef = useRef(null)
@@ -53,9 +56,40 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
 
     if (center) placeAt(center.lat, center.lng, { reverseGeocode: !address })
 
-    // ── Autocomplete ──────────────────────────────────────────────────────
-    if (searchInputRef.current && google.maps.places?.Autocomplete) {
-      const ac = new google.maps.places.Autocomplete(searchInputRef.current, {
+    // ── Place autocomplete ─────────────────────────────────────────────────
+    const places = google.maps.places || {}
+    if (searchControlRef.current && places.PlaceAutocompleteElement) {
+      const el = new places.PlaceAutocompleteElement()
+      el.setAttribute('placeholder', 'Search city or address to center the map...')
+      searchControlRef.current.innerHTML = ''
+      searchControlRef.current.appendChild(el)
+      autocompleteRef.current = el
+
+      const onPlaceSelect = async (event) => {
+        const prediction = event?.placePrediction || event?.detail?.placePrediction || event?.detail
+        if (!prediction?.toPlace) return
+        try {
+          const place = prediction.toPlace()
+          await place.fetchFields({
+            fields: ['location', 'viewport', 'formattedAddress', 'displayName'],
+          })
+          if (!place?.location) return
+          const lat = place.location.lat()
+          const lng = place.location.lng()
+          const addr = place.formattedAddress || place.displayName || ''
+          setAddress(addr)
+          if (place.viewport) map.fitBounds(place.viewport)
+          else { map.setCenter({ lat, lng }); map.setZoom(13) }
+          placeAt(lat, lng, { address: addr, reverseGeocode: false })
+        } catch (_) {
+          // Ignore transient Places API failures and keep map usable.
+        }
+      }
+
+      el.addEventListener('gmp-placeselect', onPlaceSelect)
+    } else if (searchInputRef.current && places.Autocomplete) {
+      // Fallback for projects/accounts where the legacy widget is still used.
+      const ac = new places.Autocomplete(searchInputRef.current, {
         fields: ['geometry', 'formatted_address', 'name'],
         types: ['geocode'],
       })
@@ -200,10 +234,14 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
     <div className={`space-y-3 ${className}`}>
       {/* Search box */}
       <div className="relative">
+        <div
+          ref={searchControlRef}
+          className={ready ? '' : 'hidden'}
+        />
         <input
           ref={searchInputRef}
           type="text"
-          className="input w-full"
+          className={`input w-full ${ready ? 'hidden' : ''}`}
           placeholder={ready ? 'Search city or address to center the map…' : 'Loading map…'}
           disabled={!ready}
           defaultValue={value?.address || ''}

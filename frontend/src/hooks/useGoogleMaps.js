@@ -20,8 +20,23 @@ function loadScript(key, libraries = ['places']) {
   cachedScriptPromise = new Promise((resolve, reject) => {
     const existing = document.getElementById('google-maps-js')
     if (existing) {
+      // If a previous render already loaded Maps, resolve immediately.
+      if (window.google?.maps) {
+        resolve(window.google)
+        return
+      }
+      // Existing script may already be finished (success or failure), so don't
+      // rely only on future load/error events.
+      const existingSrc = existing.getAttribute('src') || ''
+      if (/maps\.googleapis\.com\/maps\/api\/js/.test(existingSrc) && existing.dataset.loaded === 'true') {
+        resolve(window.google)
+        return
+      }
       existing.addEventListener('load', () => resolve(window.google))
-      existing.addEventListener('error', reject)
+      existing.addEventListener('error', () => {
+        cachedScriptPromise = null
+        reject(new Error('Failed to load Google Maps JS'))
+      })
       return
     }
     const s = document.createElement('script')
@@ -30,7 +45,10 @@ function loadScript(key, libraries = ['places']) {
     s.defer = true
     const libs = Array.from(new Set([...libraries, 'visualization'])).join(',')
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=${libs}&v=weekly&loading=async`
-    s.onload = () => resolve(window.google)
+    s.onload = () => {
+      s.dataset.loaded = 'true'
+      resolve(window.google)
+    }
     s.onerror = () => {
       cachedScriptPromise = null
       reject(new Error('Failed to load Google Maps JS'))

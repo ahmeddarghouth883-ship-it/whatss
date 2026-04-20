@@ -4,6 +4,7 @@ const GOOGLE_SCRIPT_ID = 'google-identity-services'
 const GOOGLE_CALLBACK_KEY = '__wfGoogleCredentialCallback'
 const GOOGLE_INIT_CLIENT_KEY = '__wfGoogleInitClientId'
 const GOOGLE_INIT_PROMISE_KEY = '__wfGoogleInitPromise'
+const GOOGLE_INITIALIZED_KEY = '__wfGoogleInitialized'
 
 function loadGoogleScript() {
   return new Promise((resolve, reject) => {
@@ -11,6 +12,11 @@ function loadGoogleScript() {
 
     const existing = document.getElementById(GOOGLE_SCRIPT_ID)
     if (existing) {
+      const existingSrc = existing.getAttribute('src') || ''
+      if (/accounts\.google\.com\/gsi\/client/.test(existingSrc) && existing.dataset.loaded === 'true') {
+        resolve()
+        return
+      }
       existing.addEventListener('load', () => resolve(), { once: true })
       existing.addEventListener('error', () => reject(new Error('Google script failed to load')), { once: true })
       return
@@ -21,7 +27,10 @@ function loadGoogleScript() {
     script.src = 'https://accounts.google.com/gsi/client'
     script.async = true
     script.defer = true
-    script.onload = () => resolve()
+    script.onload = () => {
+      script.dataset.loaded = 'true'
+      resolve()
+    }
     script.onerror = () => reject(new Error('Google script failed to load'))
     document.head.appendChild(script)
   })
@@ -58,7 +67,7 @@ export default function GoogleSignInButton({
           if (typeof cb === 'function') cb(credential)
         }
 
-        const alreadyInitialized = window[GOOGLE_INIT_CLIENT_KEY] === clientId
+        const alreadyInitialized = window[GOOGLE_INITIALIZED_KEY] === true
         if (!alreadyInitialized) {
           if (!window[GOOGLE_INIT_PROMISE_KEY]) {
             window[GOOGLE_INIT_PROMISE_KEY] = (async () => {
@@ -80,12 +89,16 @@ export default function GoogleSignInButton({
               })
 
               window[GOOGLE_INIT_CLIENT_KEY] = clientId
+              window[GOOGLE_INITIALIZED_KEY] = true
             })().finally(() => {
               window[GOOGLE_INIT_PROMISE_KEY] = null
             })
           }
 
           await window[GOOGLE_INIT_PROMISE_KEY]
+        } else if (window[GOOGLE_INIT_CLIENT_KEY] !== clientId) {
+          // GIS only uses the last initialized instance; keep the first setup stable.
+          console.warn('Google Identity Services was already initialized with a different client ID.')
         }
 
         if (!mounted || !buttonRef.current) {

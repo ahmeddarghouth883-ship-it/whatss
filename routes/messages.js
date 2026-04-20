@@ -171,6 +171,40 @@ router.post('/direct', authenticate, messageLimiter, async (req, res) => {
   }
 });
 
+// ── GET /direct/:jobId — check direct-send job status ───────────────────────
+router.get('/direct/:jobId', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.jobId)) {
+      return res.status(400).json({ error: 'Invalid job id' });
+    }
+
+    const job = await DirectSendJob.findOne({
+      _id: req.params.jobId,
+      userId: req.userId,
+    }).lean();
+
+    if (!job) return res.status(404).json({ error: 'Direct send job not found' });
+
+    return res.json({
+      ok: true,
+      job: {
+        _id: job._id,
+        status: job.status,
+        sent: job.sent || 0,
+        failed: job.failed || 0,
+        total: Array.isArray(job.phones) ? job.phones.length : 0,
+        cursor: job.cursor || 0,
+        error: job.error || '',
+        nextRunAt: job.nextRunAt || null,
+        startedAt: job.startedAt || null,
+        finishedAt: job.finishedAt || null,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /scheduled — list user's scheduled sends ────────────────────────────
 router.get('/scheduled', authenticate, async (req, res) => {
   try {

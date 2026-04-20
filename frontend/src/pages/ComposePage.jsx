@@ -152,6 +152,7 @@ export default function ComposePage() {
   const [sessions,    setSessions]    = useState([])
   const [sending,     setSending]     = useState(false)
   const [progress,    setProgress]    = useState(null)
+  const [activeJobId, setActiveJobId] = useState('')
   const [scheduleOn,  setScheduleOn]  = useState(false)
   const [scheduleAt,  setScheduleAt]  = useState(() => {
     const d = new Date(); d.setMinutes(d.getMinutes() + 30); return toLocalISO(d)
@@ -170,6 +171,7 @@ export default function ComposePage() {
     const onDone     = d => {
       setSending(false)
       setProgress(null)
+      setActiveJobId('')
       if (d.failed === 0) toast.success(`✅ All ${d.sent} messages sent!`)
       else toast(`${d.sent} sent · ${d.failed} failed`, { icon: '⚠️' })
     }
@@ -184,6 +186,47 @@ export default function ComposePage() {
     window.addEventListener('beforeunload', h)
     return () => window.removeEventListener('beforeunload', h)
   }, [sending])
+
+  // Fallback for lost/missed socket events: poll job status until it finishes.
+  useEffect(() => {
+    if (!activeJobId || !sending || scheduleOn) return
+
+    let stopped = false
+    const poll = async () => {
+      try {
+        const r = await api.get(`/messages/direct/${activeJobId}`)
+        const job = r.data?.job
+        if (!job || stopped) return
+
+        setProgress({
+          sent: Number(job.sent) || 0,
+          failed: Number(job.failed) || 0,
+          total: Number(job.total) || phones.length || 0
+        })
+
+        if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') {
+          setSending(false)
+          setActiveJobId('')
+          setProgress(null)
+          if (job.status === 'done') {
+            if ((job.failed || 0) === 0) toast.success(`✅ All ${job.sent || 0} messages sent!`)
+            else toast(`${job.sent || 0} sent · ${job.failed || 0} failed`, { icon: '⚠️' })
+          } else {
+            toast.error(job.error || 'Sending stopped before completion')
+          }
+        }
+      } catch (_) {
+        // Keep polling; transient errors are expected during deploy/reconnect.
+      }
+    }
+
+    poll()
+    const id = setInterval(poll, 3000)
+    return () => {
+      stopped = true
+      clearInterval(id)
+    }
+  }, [activeJobId, sending, scheduleOn, phones.length])
 
   async function send() {
     if (!phones.length)    return toast.error('Add at least one phone number')
@@ -211,15 +254,18 @@ export default function ComposePage() {
       if (r.data.scheduled) {
         toast.success(`⏰ Scheduled for ${new Date(r.data.scheduledAt).toLocaleString()}`)
         setSending(false)
+        setActiveJobId('')
         setPhones([])
         setMessage('')
         setMediaFiles([])
       } else {
+        setActiveJobId(String(r.data.jobId || ''))
         toast.success(`📨 Sending to ${phones.length} contacts — running in background`, { duration: 4000 })
       }
     } catch (err) {
       setSending(false)
       setProgress(null)
+      setActiveJobId('')
       const msg = err.response?.data?.error || 'Failed to send'
       if (err.response?.data?.error === 'INSUFFICIENT_CREDITS') {
         toast.error(`Not enough credits (need ${err.response.data.needed}, have ${err.response.data.have})`)

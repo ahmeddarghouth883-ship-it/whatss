@@ -190,7 +190,6 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
       try {
         await g.maps.importLibrary('visualization')
       } catch (_) {
-        // Visualization is optional; keep map usable even if unavailable.
         return
       }
     }

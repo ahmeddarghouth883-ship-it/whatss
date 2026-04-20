@@ -3,7 +3,7 @@ import api from '../api/client'
 
 let cachedKeyPromise = null
 let cachedScriptPromise = null
-let cachedLibrariesPromise = null
+const cachedLibrariesPromises = new Map()
 
 async function fetchMapsKey() {
   if (!cachedKeyPromise) {
@@ -60,18 +60,23 @@ function loadScript(key, libraries = ['places']) {
 
 async function ensureLibraries(googleObj, libraries = ['places']) {
   if (!googleObj?.maps) throw new Error('Google Maps namespace unavailable')
-  if (cachedLibrariesPromise) return cachedLibrariesPromise
   if (typeof googleObj.maps.importLibrary !== 'function') return googleObj
 
   const unique = Array.from(new Set(['maps', ...libraries]))
-  cachedLibrariesPromise = Promise.all(unique.map((lib) => googleObj.maps.importLibrary(lib)))
+  const key = unique.sort().join(',')
+  if (cachedLibrariesPromises.has(key)) {
+    return cachedLibrariesPromises.get(key)
+  }
+
+  const librariesPromise = Promise.all(unique.map((lib) => googleObj.maps.importLibrary(lib)))
     .then(() => googleObj)
     .catch((err) => {
-      cachedLibrariesPromise = null
+      cachedLibrariesPromises.delete(key)
       throw err
     })
 
-  return cachedLibrariesPromise
+  cachedLibrariesPromises.set(key, librariesPromise)
+  return librariesPromise
 }
 
 /**

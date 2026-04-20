@@ -7,7 +7,13 @@ const cachedLibrariesPromises = new Map()
 
 async function fetchMapsKey() {
   if (!cachedKeyPromise) {
-    cachedKeyPromise = api.get('/config/maps-key').then(r => r.data?.key || '').catch(() => '')
+    cachedKeyPromise = api
+      .get('/config/maps-key')
+      .then((r) => r.data?.key || '')
+      .catch((err) => {
+        const detail = err?.response?.data?.error || err?.message || 'Unknown error'
+        throw new Error(`Failed to fetch Google Maps key: ${detail}`)
+      })
   }
   return cachedKeyPromise
 }
@@ -29,15 +35,22 @@ function loadScript(key, libraries = ['places']) {
       // rely only on future load/error events.
       const existingSrc = existing.getAttribute('src') || ''
       if (/maps\.googleapis\.com\/maps\/api\/js/.test(existingSrc) && existing.dataset.loaded === 'true') {
-        resolve(window.google)
+        if (window.google?.maps) {
+          resolve(window.google)
+          return
+        }
+        // Previous script load looked successful but namespace is missing.
+        // Remove and recreate script to recover from partial-load edge cases.
+        existing.remove()
+        cachedScriptPromise = null
+      } else {
+        existing.addEventListener('load', () => resolve(window.google))
+        existing.addEventListener('error', () => {
+          cachedScriptPromise = null
+          reject(new Error('Failed to load Google Maps JS'))
+        })
         return
       }
-      existing.addEventListener('load', () => resolve(window.google))
-      existing.addEventListener('error', () => {
-        cachedScriptPromise = null
-        reject(new Error('Failed to load Google Maps JS'))
-      })
-      return
     }
     const s = document.createElement('script')
     s.id = 'google-maps-js'
@@ -81,7 +94,7 @@ async function ensureLibraries(googleObj, libraries = ['places']) {
 
 /**
  * useGoogleMaps — loads the Google Maps JS API once and returns { google, ready, error }.
- * The API key is fetched from the authenticated /api/config/maps-key endpoint,
+ * The API key is fetched from the /api/config/maps-key endpoint,
  * so it lives only in env/logs on the server (no VITE_* duplication).
  */
 export function useGoogleMaps(libraries = ['places']) {

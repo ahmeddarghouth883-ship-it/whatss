@@ -1,5 +1,5 @@
 /**
- * /api/config — serves runtime config to the authenticated frontend.
+ * /api/config — serves runtime config to the frontend.
  * Currently exposes the Google Maps JS API key so the frontend map picker
  * can boot without duplicating the key in a Vite env file.
  *
@@ -7,13 +7,13 @@
  */
 
 const express = require('express');
-const { authenticate } = require('../helpers/auth');
 
 const router = express.Router();
 
-router.get('/maps-key', authenticate, (req, res) => {
+router.get('/maps-key', (req, res) => {
   const key = process.env.GOOGLE_PLACES_API_KEY || '';
   if (!key) return res.status(500).json({ error: 'GOOGLE_PLACES_API_KEY not configured' });
+  res.set('Cache-Control', 'public, max-age=300');
   return res.json({ key });
 });
 

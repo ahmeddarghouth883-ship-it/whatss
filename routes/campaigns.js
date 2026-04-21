@@ -9,7 +9,7 @@ const Campaign  = require('../models/Campaign');
 const Lead      = require('../models/Lead');
 const Message   = require('../models/Message');
 const wallet    = require('../helpers/wallet');
-const { sendMessage } = require('../helpers/whatsappManager');
+const { sendMessage, getClient } = require('../helpers/whatsappManager');
 const { touchLeadLastContactedByLeadId } = require('../helpers/leadContact');
 const { BATCH_SIZE, BREAK_MS } = require('../helpers/sendBatchConfig');
 
@@ -59,6 +59,15 @@ async function processCampaign(campaignId, io) {
     if (!campaign) return;
 
     const userId = campaign.userId;
+    if (!getClient(campaign.sessionId)) {
+      campaign.status = 'paused';
+      await campaign.save();
+      io.to(roomForUser(userId)).emit('campaign:error', {
+        campaignId: id,
+        error: 'SESSION_NOT_CONNECTED',
+      });
+      return;
+    }
     const leadsRaw = await Lead.find({
       _id: { $in: campaign.leadIds },
       userId: campaign.userId,
@@ -80,6 +89,15 @@ async function processCampaign(campaignId, io) {
         campaign = await Campaign.findById(campaignId);
         if (!campaign || campaign.status === 'paused') break outer;
         if (campaign.status !== 'running') break outer;
+        if (!getClient(campaign.sessionId)) {
+          campaign.status = 'paused';
+          await campaign.save();
+          io.to(roomForUser(userId)).emit('campaign:error', {
+            campaignId: id,
+            error: 'SESSION_NOT_CONNECTED',
+          });
+          break outer;
+        }
 
         const lead = leads[i];
         const text = personalize(campaign.message, lead);
@@ -302,6 +320,11 @@ router.post('/:id/send', authenticate, async (req, res) => {
     const campaign = await Campaign.findOne({ _id: req.params.id, userId: req.userId });
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
     if (!campaign.leadIds?.length) return res.status(400).json({ error: 'No leads in this campaign' });
+    if (!getClient(campaign.sessionId)) {
+      return res.status(409).json({
+        error: 'Session not connected. Open Sessions and reconnect your WhatsApp account first.'
+      });
+    }
 
     campaign.status = 'running';
     campaign.startedAt = campaign.startedAt || new Date();

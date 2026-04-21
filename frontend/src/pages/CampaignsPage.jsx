@@ -62,15 +62,22 @@ function CreateModal({ onClose, onCreate }) {
         `Campaign ${new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}`
 
       const { data } = await api.post('/campaigns', { ...form, name, mediaUrl: mediaFile?.url || undefined })
+      onCreate(data.campaign)
 
       if (sendNow && !form.scheduledAt) {
-        await api.post(`/campaigns/${data.campaign._id}/send`)
-        toast.success(`Sending to ${data.leadCount} contacts!`)
+        try {
+          await api.post(`/campaigns/${data.campaign._id}/send`)
+          toast.success(`Sending to ${data.leadCount} contacts!`)
+        } catch (sendErr) {
+          // Campaign is created, but launch can fail (e.g. disconnected WA session).
+          toast.error(sendErr.response?.data?.error || 'Campaign created but failed to start')
+          onClose()
+          return
+        }
       } else {
         toast.success(`Campaign saved — ${data.leadCount} leads matched.`)
       }
 
-      onCreate(data.campaign)
       onClose()
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to create campaign')

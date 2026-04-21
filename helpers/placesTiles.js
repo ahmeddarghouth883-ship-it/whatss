@@ -17,8 +17,9 @@
  *      ___\  S  /___
  *          \___/
  *
- * 1 center + 6 outer hex tiles. Sub-radius is ~radius/2.5 so neighbouring
- * tiles overlap by ~10-20% (no holes).
+ * 1 center + 6 outer hex tiles. The geometry is intentionally aggressive:
+ * smaller overlap and larger center-to-ring spacing to prioritize unique
+ * results over dense duplicate coverage.
  */
 
 const EARTH_DEG_PER_M = 1 / 111111;
@@ -39,9 +40,10 @@ function tileCircle(lat, lng, radius, target = 60) {
   // Small ask -> one tile, the original circle.
   if (t <= 60) return [{ lat, lng, radius: r }];
 
-  // Otherwise hex split into 7 (1 center + 6 ring).
-  const subR  = Math.max(500, Math.round(r / 2.5));
-  const ringR = Math.max(subR, r - subR);
+  // Otherwise hex split into 7 (1 center + 6 ring) with lower overlap.
+  // subR is reduced and ring centers are pushed farther out.
+  const subR  = Math.max(400, Math.round(r * 0.42));
+  const ringR = Math.max(subR * 1.4, r - subR * 0.7);
 
   const tiles = [{ lat, lng, radius: subR }];
   const cosLat = Math.cos((lat * Math.PI) / 180) || 1e-6;

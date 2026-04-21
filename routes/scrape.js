@@ -17,7 +17,7 @@ const express = require('express');
 const { authenticate } = require('../helpers/auth');
 const ScrapeJob = require('../models/ScrapeJob');
 const Lead      = require('../models/Lead');
-const { searchLeads, phoneKey } = require('../helpers/placesService');
+const { searchLeads, phoneKey, normalizePhone } = require('../helpers/placesService');
 const { tileCircle, estimateCost } = require('../helpers/placesTiles');
 const { reverseGeocode } = require('../helpers/geocode');
 const { trackPlacesCall, trackGeocodeCall } = require('../helpers/usage');
@@ -44,6 +44,35 @@ function emitUser(io, userId, event, payload) {
   } catch (e) {
     console.warn('[scrape] emit failed:', e.message);
   }
+}
+
+function stableHash(input) {
+  let h = 2166136261;
+  const s = String(input || '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return h >>> 0;
+}
+
+function buildTileQueryPlan(queries, tileCount, seed) {
+  const list = Array.from(new Set((queries || []).filter(Boolean)));
+  if (list.length === 0 || tileCount <= 0) return [];
+
+  // Deterministic rotation so jobs spread query priorities predictably.
+  const offset = stableHash(seed) % list.length;
+  const rotated = list.slice(offset).concat(list.slice(0, offset));
+  const chunkSize = Math.max(1, Math.ceil(rotated.length / tileCount));
+
+  return Array.from({ length: tileCount }, (_, idx) => {
+    const start = idx * chunkSize;
+    const end = start + chunkSize;
+    const chunk = rotated.slice(start, end);
+    if (chunk.length > 0) return chunk;
+    // More tiles than queries -> cycle so each tile still runs something.
+    return [rotated[idx % rotated.length]];
+  });
 }
 
 async function pushTimeline(jobId, entry) {
@@ -80,6 +109,7 @@ async function runScrapeJob({ io, job }) {
     // Sub-categories: if the user picked a broad industry like "restaurants",
     // we'll loop a small list inside each tile to break the 60-cap further.
     const queries = expandIndustry(job.category);
+    const tileQueryPlan = buildTileQueryPlan(queries, tiles.length, job.jobId);
 
     await pushTimeline(job.jobId, {
       event: 'job_started',
@@ -87,6 +117,7 @@ async function runScrapeJob({ io, job }) {
       category: job.category,
       planCount: tiles.length,
       planMaxResults: target,
+      queryCount: queries.length,
     });
 
     // ── Tile loop (1..7 sub-circles) × sub-category loop ───────────────────
@@ -101,20 +132,30 @@ async function runScrapeJob({ io, job }) {
 
       const tile = tiles[i];
       const tileStart = Date.now();
+      const plannedQueries = tileQueryPlan[i] || queries;
+      const queriesRun = new Set();
+      let tileRawCount = 0;
+      let tileWithPhoneCount = 0;
+      let tileDedupedCount = 0;
+      let tileAddedFromShard = 0;
+      let tileAddedFromFallback = 0;
+      let fallbackUsed = false;
+
       await pushTimeline(job.jobId, {
         event: 'plan_started',
         planIndex: i + 1,
         planCount: tiles.length,
         zone: job.zone,
         category: job.category,
+        queryCount: plannedQueries.length,
       });
 
       let added = 0;
-      for (const q of queries) {
+      for (const q of plannedQueries) {
         if (controller.signal.aborted) break outer;
         if (collected.length >= target) break;
         try {
-          const { leads: tileLeads, totalFound: tileTotal } = await searchLeads({
+          const { leads: tileLeads, totalFound: tileTotal, raw } = await searchLeads({
             industry:     q,
             lat:          tile.lat,
             lng:          tile.lng,
@@ -127,7 +168,13 @@ async function runScrapeJob({ io, job }) {
             requirePhone: true,
             onApiCall:    () => trackPlacesCall(job.userId, 1),
           });
+          queriesRun.add(q);
           totalFound += tileTotal;
+          tileRawCount += tileTotal;
+          tileWithPhoneCount += (Array.isArray(raw)
+            ? raw.reduce((n, p) => n + (normalizePhone(p?.internationalPhoneNumber || p?.nationalPhoneNumber) ? 1 : 0), 0)
+            : 0);
+          tileDedupedCount += tileLeads.length;
 
           for (const lead of tileLeads) {
             const k = phoneKey(lead.phone);
@@ -135,6 +182,7 @@ async function runScrapeJob({ io, job }) {
             seenPhones.add(k);
             collected.push(lead);
             added++;
+            tileAddedFromShard++;
             if (collected.length >= target) break;
           }
         } catch (tErr) {
@@ -148,6 +196,56 @@ async function runScrapeJob({ io, job }) {
         }
       }
 
+      // Fallback pass: if sharded queries underperform badly, run missing queries.
+      const minExpectedPerTile = Math.max(2, Math.round(target / Math.max(tiles.length, 1) * 0.25));
+      if (!controller.signal.aborted && collected.length < target && tileAddedFromShard < minExpectedPerTile) {
+        const fallbackQueries = queries.filter((q) => !queriesRun.has(q));
+        for (const q of fallbackQueries) {
+          if (controller.signal.aborted) break outer;
+          if (collected.length >= target) break;
+          try {
+            const { leads: tileLeads, totalFound: tileTotal, raw } = await searchLeads({
+              industry:     q,
+              lat:          tile.lat,
+              lng:          tile.lng,
+              radius:       tile.radius,
+              zone:         job.zone,
+              scrapeJobId:  job.jobId,
+              signal:       controller.signal,
+              regionCode:   job.regionCode || undefined,
+              languageCode: job.languageCode || undefined,
+              requirePhone: true,
+              onApiCall:    () => trackPlacesCall(job.userId, 1),
+            });
+            fallbackUsed = true;
+            queriesRun.add(q);
+            totalFound += tileTotal;
+            tileRawCount += tileTotal;
+            tileWithPhoneCount += (Array.isArray(raw)
+              ? raw.reduce((n, p) => n + (normalizePhone(p?.internationalPhoneNumber || p?.nationalPhoneNumber) ? 1 : 0), 0)
+              : 0);
+            tileDedupedCount += tileLeads.length;
+
+            for (const lead of tileLeads) {
+              const k = phoneKey(lead.phone);
+              if (!k || seenPhones.has(k)) continue;
+              seenPhones.add(k);
+              collected.push(lead);
+              added++;
+              tileAddedFromFallback++;
+              if (collected.length >= target) break;
+            }
+          } catch (tErr) {
+            if (controller.signal.aborted) break outer;
+            await pushTimeline(job.jobId, {
+              event: 'plan_failed',
+              planIndex: i + 1,
+              errorMessage: String(tErr?.message || '').slice(0, 300),
+            });
+          }
+        }
+      }
+
       emitUser(io, userId, 'scrape:found', { jobId: job.jobId, count: collected.length });
       ScrapeJob.updateOne({ jobId: job.jobId }, { $set: { found: collected.length } }).catch(() => {});
 
@@ -156,6 +254,14 @@ async function runScrapeJob({ io, job }) {
         planIndex: i + 1,
         planCount: tiles.length,
         added,
+        rawCount: tileRawCount,
+        withPhoneCount: tileWithPhoneCount,
+        dedupedCount: tileDedupedCount,
+        uniqueRate: tileRawCount > 0 ? Number((added / tileRawCount).toFixed(4)) : 0,
+        shardAdded: tileAddedFromShard,
+        fallbackAdded: tileAddedFromFallback,
+        fallbackUsed,
+        queryCount: queriesRun.size,
         totalFound: collected.length,
         durationMs: Date.now() - tileStart,
       });

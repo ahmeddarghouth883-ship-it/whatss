@@ -50,7 +50,15 @@ function formatTimelineEvent(entry) {
   if (event === 'job_failed')      return `Job failed (${entry?.errorCode || 'EXTRACTION_FAILURE'})`
   if (event === 'job_cancelled')   return 'Job cancelled by user'
   if (event === 'plan_started')    return `${planLabel} started`
-  if (event === 'plan_completed')  return `${planLabel} done${addedLabel}${durationLabel}`
+  if (event === 'plan_completed') {
+    const raw = Number.isFinite(Number(entry?.rawCount)) ? Number(entry.rawCount) : null
+    const withPhone = Number.isFinite(Number(entry?.withPhoneCount)) ? Number(entry.withPhoneCount) : null
+    const deduped = Number.isFinite(Number(entry?.dedupedCount)) ? Number(entry.dedupedCount) : null
+    const diagnostics = (raw !== null && withPhone !== null && deduped !== null)
+      ? ` · raw:${raw} phone:${withPhone} deduped:${deduped}`
+      : ''
+    return `${planLabel} done${addedLabel}${durationLabel}${diagnostics}`
+  }
   if (event === 'plan_failed')     return `${planLabel} failed`
   return event || 'event'
 }

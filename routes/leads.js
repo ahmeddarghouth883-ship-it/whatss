@@ -12,6 +12,7 @@
 const express  = require('express');
 const mongoose = require('mongoose');
 const jwt      = require('jsonwebtoken');
+const ExcelJS  = require('exceljs');
 const Lead     = require('../models/Lead');
 const { authenticate } = require('../helpers/auth');
 
@@ -241,6 +242,77 @@ router.post('/bulk-delete', authenticate, async (req, res) => {
   if (ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
   const r = await Lead.deleteMany({ _id: { $in: ids }, userId: req.userId });
   return res.json({ ok: true, deleted: r.deletedCount });
+});
+
+const EXPORT_EXCEL_MAX = 5000;
+
+router.post('/export-excel', authenticate, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((id) => mongoose.isValidObjectId(id)) : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
+    if (ids.length > EXPORT_EXCEL_MAX) return res.status(400).json({ error: `Too many leads selected (max ${EXPORT_EXCEL_MAX})` });
+
+    const rows = await Lead.find({ _id: { $in: ids }, userId: req.userId }).lean();
+    const byId = new Map(rows.map((row) => [String(row._id), row]));
+    const orderedRows = ids.map((id) => byId.get(String(id))).filter(Boolean);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Whispflow';
+    const sheet = workbook.addWorksheet('Leads', { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = [
+      { header: 'Name', key: 'name', width: 28 },
+      { header: 'Phone', key: 'phone', width: 18 },
+      { header: 'Phone formatted', key: 'phoneFormatted', width: 18 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'Category', key: 'category', width: 18 },
+      { header: 'Zone', key: 'zone', width: 16 },
+      { header: 'City', key: 'city', width: 18 },
+      { header: 'Address', key: 'address', width: 36 },
+      { header: 'Website', key: 'website', width: 32 },
+      { header: 'Rating', key: 'rating', width: 10 },
+      { header: 'Reviews', key: 'reviews', width: 10 },
+      { header: 'WhatsApp verified', key: 'whatsappVerified', width: 18 },
+      { header: 'WA checked at', key: 'whatsappCheckedAt', width: 20 },
+      { header: 'Tags', key: 'tags', width: 24 },
+      { header: 'Notes', key: 'notes', width: 36 },
+      { header: 'Opted out', key: 'optedOut', width: 10 },
+      { header: 'Last contacted', key: 'lastContacted', width: 20 },
+      { header: 'Created', key: 'createdAt', width: 20 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+
+    for (const r of orderedRows) {
+      sheet.addRow({
+        name: r.name || '',
+        phone: r.phone || '',
+        phoneFormatted: r.phoneFormatted || '',
+        email: r.email || '',
+        category: r.category || '',
+        zone: r.zone || '',
+        city: r.city || '',
+        address: r.address || '',
+        website: r.website || '',
+        rating: r.rating ?? '',
+        reviews: r.reviews ?? '',
+        whatsappVerified: r.whatsappVerified ? 'Yes' : 'No',
+        whatsappCheckedAt: r.whatsappCheckedAt ? new Date(r.whatsappCheckedAt) : '',
+        tags: Array.isArray(r.tags) ? r.tags.join(', ') : '',
+        notes: r.notes || '',
+        optedOut: r.optedOut ? 'Yes' : 'No',
+        lastContacted: r.lastContacted ? new Date(r.lastContacted) : '',
+        createdAt: r.createdAt ? new Date(r.createdAt) : '',
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const fname = `leads-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    return res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[leads/export-excel]', err.message);
+    return res.status(500).json({ error: err.message || 'Export failed' });
+  }
 });
 
 module.exports = router;

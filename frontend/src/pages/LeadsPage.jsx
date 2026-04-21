@@ -210,6 +210,7 @@ export default function LeadsPage() {
   const [editingLead,   setEditingLead]   = useState(null)   // _id of inline editor row
   const [busyId,        setBusyId]        = useState(null)
   const [waSessions,    setWaSessions]    = useState([])
+  const [busyAction,    setBusyAction]    = useState('')
 
   useEffect(() => {
     api.get('/whatsapp/sessions').then(r => setWaSessions(r.data.sessions || [])).catch(() => {})
@@ -277,8 +278,8 @@ export default function LeadsPage() {
 
   useEffect(() => { loadLeads() }, [loadLeads])
   useEffect(() => {
-    api.get('/scrape/zones').then(r => setZones(r.data.zones))
-    api.get('/scrape/categories').then(r => setCats(r.data.categories))
+    api.get('/extract/zones').then(r => setZones(r.data.zones))
+    api.get('/extract/categories').then(r => setCats(r.data.categories))
   }, [])
 
   function toggleSelect(id) {
@@ -299,10 +300,51 @@ export default function LeadsPage() {
   }
   async function deleteSelected() {
     if (!confirm(`Delete ${selected.size} leads?`)) return
-    await Promise.all([...selected].map(id => api.delete(`/leads/${id}`)))
-    toast.success(`${selected.size} leads deleted`)
-    setSelected(new Set())
-    loadLeads()
+    setBusyAction('delete')
+    try {
+      const ids = [...selected]
+      const r = await api.post('/leads/bulk-delete', { ids })
+      toast.success(`${r.data.deleted || ids.length} leads deleted`)
+      setSelected(new Set())
+      loadLeads()
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Delete failed')
+    } finally {
+      setBusyAction('')
+    }
+  }
+  async function exportSelectedExcel() {
+    if (selected.size === 0) return
+    setBusyAction('excel')
+    try {
+      const ids = [...selected]
+      const res = await api.post('/leads/export-excel', { ids }, { responseType: 'blob' })
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+      const cd = res.headers['content-disposition'] || ''
+      const match = cd.match(/filename="?([^";]+)"?/i)
+      const filename = match ? match[1] : `leads-export-${new Date().toISOString().slice(0, 10)}.xlsx`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success(`Exported ${ids.length} lead${ids.length > 1 ? 's' : ''}`)
+    } catch (e) {
+      let msg = e?.response?.data?.error || e?.message || 'Export failed'
+      if (e?.response?.data instanceof Blob) {
+        try {
+          const txt = await e.response.data.text()
+          const parsed = JSON.parse(txt)
+          msg = parsed.error || msg
+        } catch (_) {}
+      }
+      toast.error(msg)
+    } finally {
+      setBusyAction('')
+    }
   }
   async function exportCSV() {
     const params = new URLSearchParams()
@@ -334,7 +376,7 @@ export default function LeadsPage() {
           <button onClick={exportCSV} className="btn-secondary flex-1 sm:flex-none justify-center">
             ↓ Export CSV
           </button>
-          <Link to="/scrape" className="btn-primary flex-1 sm:flex-none justify-center">⊕ Extract more</Link>
+          <Link to="/extract" className="btn-primary flex-1 sm:flex-none justify-center">⊕ Extract more</Link>
         </div>
       </div>
 
@@ -358,6 +400,13 @@ export default function LeadsPage() {
               <CopyIcon /> Copy numbers
             </button>
             <button
+              onClick={exportSelectedExcel}
+              disabled={busyAction === 'excel'}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-4 text-sm border border-green-300 text-green-700 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-60"
+            >
+              {busyAction === 'excel' ? 'Exporting…' : '↓ Export Excel'}
+            </button>
+            <button
               onClick={verifyWaSelection}
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-4 text-sm border border-green-300 text-green-700 hover:bg-green-100 rounded-lg transition-colors"
               title="Check which selected leads have WhatsApp"
@@ -366,9 +415,10 @@ export default function LeadsPage() {
             </button>
             <button
               onClick={deleteSelected}
-              className="flex-1 sm:flex-none justify-center py-2 px-4 text-sm border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              disabled={busyAction === 'delete'}
+              className="flex-1 sm:flex-none justify-center py-2 px-4 text-sm border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60"
             >
-              Delete
+              {busyAction === 'delete' ? 'Deleting…' : 'Delete'}
             </button>
             <button
               onClick={() => setSelected(new Set())}

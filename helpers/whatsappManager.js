@@ -96,7 +96,27 @@ function toWaJid(phone) {
  * Create or restore a WhatsApp client for a given sessionId.
  * Emits Socket.IO events: wa:qr, wa:ready, wa:disconnected
  */
-async function createClient(sessionId, userId, io) {
+function isTransientInitError(message) {
+  const m = String(message || '').toLowerCase();
+  return (
+    m.includes('navigating frame was detached') ||
+    m.includes('execution context was destroyed') ||
+    m.includes('target closed') ||
+    m.includes('browser has disconnected')
+  );
+}
+
+async function createClient(sessionId, userId, io, opts = {}) {
+  const attempt = Number(opts.attempt || 1);
+  const maxAttempts = Math.max(1, Number(process.env.WA_INIT_RETRIES || 2));
+  const forceRecreate = !!opts.forceRecreate;
+
+  if (forceRecreate && clients.has(sessionId)) {
+    try {
+      await clients.get(sessionId)?.destroy?.();
+    } catch (_) {}
+    clients.delete(sessionId);
+  }
   if (clients.has(sessionId)) return clients.get(sessionId);
 
   const authRel =
@@ -246,11 +266,25 @@ async function createClient(sessionId, userId, io) {
   } catch (err) {
     const message = err?.message || String(err);
     console.error('[whatsapp] initialize failed:', sessionId, message);
-    emit('wa:error', { message: `WhatsApp could not start (${message}). On a server, ensure Chromium/Puppeteer deps and a writable auth folder.` });
     clients.delete(sessionId);
     try {
       await client.destroy?.();
     } catch (_) {}
+
+    const canRetry = attempt < maxAttempts && isTransientInitError(message);
+    if (canRetry) {
+      await WASession.findOneAndUpdate(
+        { sessionId },
+        { status: 'connecting' }
+      ).catch(() => {});
+      await new Promise((r) => setTimeout(r, 1500));
+      return createClient(sessionId, userId, io, {
+        attempt: attempt + 1,
+        forceRecreate: true,
+      });
+    }
+
+    emit('wa:error', { message: `WhatsApp could not start (${message}). On a server, ensure Chromium/Puppeteer deps and a writable auth folder.` });
     await WASession.findOneAndUpdate(
       { sessionId },
       { status: 'disconnected', qrCode: null }

@@ -70,7 +70,9 @@ app.use('/api/config',   require('./routes/config'));
 app.use('/api/me',       require('./routes/me'));
 app.use('/api/plans',    require('./routes/plans'));      // public
 app.use('/api/orders',   require('./routes/orders'));     // auth
-app.use('/api/scrape',     require('./routes/scrape'));
+const scrapeRoutes = require('./routes/scrape');
+app.use('/api/scrape',     scrapeRoutes);
+app.use('/api/extract',    scrapeRoutes); // Compatibility alias for renamed frontend calls.
 app.use('/api/leads',      require('./routes/leads'));
 app.use('/api/campaigns',  require('./routes/campaigns'));
 app.use('/api/messages',   require('./routes/messages'));

@@ -9,6 +9,24 @@ const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
 // In-memory map of active WA clients: sessionId -> Client instance
 const clients = new Map();
+const reconnectTimers = new Map();
+const reconnectAttempts = new Map();
+const MAX_RECONNECT_ATTEMPTS = Math.max(1, Number(process.env.WA_RECONNECT_MAX_ATTEMPTS || 10));
+
+function clearReconnectTimer(sessionId) {
+  const t = reconnectTimers.get(sessionId);
+  if (t) {
+    clearTimeout(t);
+    reconnectTimers.delete(sessionId);
+  }
+}
+
+function reconnectDelayMs(attempt) {
+  const base = Math.max(2000, Number(process.env.WA_RECONNECT_BASE_MS || 4000));
+  const max = Math.max(base, Number(process.env.WA_RECONNECT_MAX_MS || 60000));
+  const exp = Math.min(6, Math.max(0, attempt - 1));
+  return Math.min(max, base * (2 ** exp));
+}
 
 function ensureAuthDir(dataPath) {
   try {
@@ -92,6 +110,28 @@ function toWaJid(phone) {
   return `${digits}@c.us`;
 }
 
+async function ensureClientReady(client, sessionId) {
+  if (!client) throw new Error(`Session ${sessionId} not connected`);
+
+  // whatsapp-web.js may keep a client instance while browser/page is gone.
+  if (!client.pupPage) {
+    throw new Error(`Session ${sessionId} is not ready (browser page unavailable)`);
+  }
+
+  try {
+    const state = await client.getState();
+    if (state !== 'CONNECTED') {
+      throw new Error(`Session ${sessionId} is not ready (${state || 'unknown_state'})`);
+    }
+  } catch (err) {
+    const msg = String(err?.message || err || '');
+    if (/not ready|disconnected|not connected|context destroyed|target closed|frame/i.test(msg)) {
+      throw new Error(`Session ${sessionId} is not ready`);
+    }
+    throw err;
+  }
+}
+
 /**
  * Create or restore a WhatsApp client for a given sessionId.
  * Emits Socket.IO events: wa:qr, wa:ready, wa:disconnected
@@ -118,6 +158,7 @@ async function createClient(sessionId, userId, io, opts = {}) {
     clients.delete(sessionId);
   }
   if (clients.has(sessionId)) return clients.get(sessionId);
+  clearReconnectTimer(sessionId);
 
   const authRel =
     process.env.WWEBJS_AUTH_PATH ||
@@ -130,7 +171,10 @@ async function createClient(sessionId, userId, io, opts = {}) {
       clientId: sessionId,
       dataPath: authAbs,
     }),
-    puppeteer: buildPuppeteerOptions()
+    puppeteer: buildPuppeteerOptions(),
+    takeoverOnConflict: true,
+    takeoverTimeoutMs: Math.max(0, Number(process.env.WA_TAKEOVER_TIMEOUT_MS || 0)),
+    qrMaxRetries: Math.max(0, Number(process.env.WA_QR_MAX_RETRIES || 0)),
   });
 
   const emit = (event, data) => {
@@ -162,6 +206,8 @@ async function createClient(sessionId, userId, io, opts = {}) {
   });
 
   client.on('ready', async () => {
+    reconnectAttempts.set(sessionId, 0);
+    clearReconnectTimer(sessionId);
     const info = client.info;
     emit('wa:ready', { phone: info?.wid?.user, name: info?.pushname });
     await WASession.findOneAndUpdate(
@@ -179,10 +225,34 @@ async function createClient(sessionId, userId, io, opts = {}) {
   });
 
   client.on('disconnected', async (reason) => {
+    const reasonText = String(reason || '').toUpperCase();
     emit('wa:disconnected', { reason });
     await WASession.findOneAndUpdate({ sessionId }, { status: 'disconnected' });
     clients.delete(sessionId);
     console.log(`❌ WA session disconnected: ${sessionId} — ${reason}`);
+
+    // LOGOUT means user explicitly unlinked the device; don't auto-loop reconnect.
+    if (reasonText.includes('LOGOUT')) return;
+
+    const prev = Number(reconnectAttempts.get(sessionId) || 0);
+    const nextAttempt = prev + 1;
+    reconnectAttempts.set(sessionId, nextAttempt);
+    if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
+      emit('wa:error', { message: `Session dropped and exceeded auto-reconnect attempts (${MAX_RECONNECT_ATTEMPTS}). Please open session and rescan QR.` });
+      return;
+    }
+
+    const waitMs = reconnectDelayMs(nextAttempt);
+    clearReconnectTimer(sessionId);
+    reconnectTimers.set(
+      sessionId,
+      setTimeout(() => {
+        reconnectTimers.delete(sessionId);
+        createClient(sessionId, userId, io, { forceRecreate: true }).catch((e) => {
+          console.error('[whatsapp] auto-reconnect failed:', sessionId, e?.message || e);
+        });
+      }, waitMs)
+    );
   });
 
   client.on('message', async (msg) => {
@@ -303,7 +373,7 @@ async function createClient(sessionId, userId, io, opts = {}) {
  */
 async function sendMessage(sessionId, phone, text, mediaSource = null) {
   const client = clients.get(sessionId);
-  if (!client) throw new Error(`Session ${sessionId} not connected`);
+  await ensureClientReady(client, sessionId);
 
   const chatId = phone.includes('@c.us') ? phone : toWaJid(phone);
 
@@ -346,7 +416,7 @@ async function sendMessage(sessionId, phone, text, mediaSource = null) {
  */
 async function checkWhatsApp(sessionId, phone) {
   const client = clients.get(sessionId);
-  if (!client) throw new Error(`Session ${sessionId} not connected`);
+  await ensureClientReady(client, sessionId);
   const chatId = toWaJid(phone);
   const result = await client.isRegisteredUser(chatId);
   return result;
@@ -356,6 +426,8 @@ async function checkWhatsApp(sessionId, phone) {
  * Disconnect and destroy a session.
  */
 async function destroySession(sessionId) {
+  clearReconnectTimer(sessionId);
+  reconnectAttempts.delete(sessionId);
   const client = clients.get(sessionId);
   if (client) {
     await client.destroy();

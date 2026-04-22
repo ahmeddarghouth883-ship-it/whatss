@@ -22,6 +22,7 @@ const { tileCircle, estimateCost } = require('../helpers/placesTiles');
 const { reverseGeocode } = require('../helpers/geocode');
 const { trackPlacesCall, trackGeocodeCall } = require('../helpers/usage');
 const { expandIndustry } = require('../helpers/subcategories');
+const { attachWebsiteAvailability } = require('../helpers/websiteAvailability');
 const wallet = require('../helpers/wallet');
 const { scrapeLimiter } = require('../helpers/rateLimit');
 
@@ -277,7 +278,7 @@ async function runScrapeJob({ io, job }) {
       return;
     }
 
-    const leads = collected;
+    const leads = await attachWebsiteAvailability(collected, { signal: controller.signal });
     emitUser(io, userId, 'scrape:saving', { jobId: job.jobId, total: leads.length });
     await ScrapeJob.updateOne(
       { jobId: job.jobId },
@@ -293,7 +294,7 @@ async function runScrapeJob({ io, job }) {
     for (const lead of leads) {
       let leadDoc;
       try {
-        leadDoc = await Lead.create({
+        const leadPayload = {
           userId:      job.userId,
           name:        lead.name || 'Unknown',
           phone:       lead.phone,
@@ -305,7 +306,13 @@ async function runScrapeJob({ io, job }) {
           reviews:     lead.reviews,
           website:     lead.website,
           scrapeJobId: job.jobId,
-        });
+        };
+        if (lead.website && lead.websiteCheckedAt != null) {
+          leadPayload.websiteReachable = lead.websiteReachable;
+          if (lead.websiteHttpStatus != null) leadPayload.websiteHttpStatus = lead.websiteHttpStatus;
+          leadPayload.websiteCheckedAt = lead.websiteCheckedAt;
+        }
+        leadDoc = await Lead.create(leadPayload);
       } catch (err) {
         if (err?.code === 11000) { dupes++; continue; }
         console.warn('[scrape] lead insert error:', err.message);

@@ -43,6 +43,32 @@ function formatLastMessaged(iso) {
   return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function websiteHref(raw) {
+  if (!raw) return '#'
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+}
+
+function LeadWebsiteCell({ lead }) {
+  if (!lead.website) {
+    return <span className="text-gray-300 text-xs">—</span>
+  }
+  const href = websiteHref(lead.website)
+  let label = lead.website.replace(/^https?:\/\//i, '')
+  if (label.length > 40) label = `${label.slice(0, 22)}…${label.slice(-14)}`
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs text-blue-600 hover:underline truncate max-w-[220px] inline-block align-bottom"
+      title={lead.website}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {label}
+    </a>
+  )
+}
+
 // ── Tiny copy icon ────────────────────────────────────────────────────────────
 function CopyIcon() {
   return (
@@ -488,16 +514,16 @@ export default function LeadsPage() {
                     className="rounded"
                   />
                 </th>
-                {['Name', 'Phone', 'Category', 'Zone', 'Rating', 'WA', 'Messaged', 'Actions'].map(h => (
+                {['Name', 'Phone', 'Category', 'Zone', 'Website', 'Rating', 'WA', 'Messaged', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
               ) : leads.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">No leads found</td></tr>
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">No leads found</td></tr>
               ) : leads.map(lead => (
                 <tr key={lead._id} className={`hover:bg-gray-50 transition-colors ${selected.has(lead._id) ? 'bg-green-50' : ''}`}>
                   <td className="px-4 py-3">
@@ -518,6 +544,7 @@ export default function LeadsPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 capitalize text-xs">{lead.category}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{lead.zone}</td>
+                  <td className="px-4 py-3 max-w-[240px]"><LeadWebsiteCell lead={lead} /></td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{lead.rating ? `★ ${lead.rating}` : '—'}</td>
                   <td className="px-4 py-3">
                     {lead.whatsappVerified
@@ -566,7 +593,7 @@ export default function LeadsPage() {
                 let notesRef = lead.notes || ''
                 return (
                   <tr key={`${editingLead}-edit`} className="bg-yellow-50/40 dark:bg-yellow-900/10 border-b border-yellow-100 dark:border-yellow-900">
-                    <td colSpan={9} className="px-4 py-3">
+                    <td colSpan={10} className="px-4 py-3">
                       <div className="flex flex-col gap-2 max-w-2xl">
                         <p className="text-[11px] text-gray-500 uppercase tracking-wide">Edit {lead.name}</p>
                         <input
@@ -640,6 +667,11 @@ export default function LeadsPage() {
                     <span>{lead.zone}</span>
                     {lead.rating && <span>· ★ {lead.rating}</span>}
                   </div>
+                  {lead.website && (
+                    <div className="pl-6 pt-1" onClick={(e) => e.stopPropagation()}>
+                      <LeadWebsiteCell lead={lead} />
+                    </div>
+                  )}
                   {lead.lastContacted && (
                     <p className="text-[11px] text-emerald-700 pl-6 pt-0.5">
                       ✉ Messaged {formatLastMessaged(lead.lastContacted)}

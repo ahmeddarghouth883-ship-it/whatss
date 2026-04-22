@@ -12,6 +12,10 @@ const LeadSchema = new mongoose.Schema({
   rating:           { type: Number },
   reviews:          { type: Number },
   website:          { type: String },
+  /** Set during extraction: HTTP probe succeeded (server responded). */
+  websiteReachable: { type: Boolean },
+  websiteHttpStatus:{ type: Number },
+  websiteCheckedAt: { type: Date },
   email:            { type: String, lowercase: true, trim: true },
   enrichedAt:       { type: Date },
   whatsappVerified: { type: Boolean, default: false },

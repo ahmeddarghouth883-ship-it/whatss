@@ -9,6 +9,7 @@
  */
 
 const PLACES_URL = 'https://places.googleapis.com/v1/places:searchText';
+const PLACES_DETAIL_BASE = 'https://places.googleapis.com/v1/places';
 
 const FIELD_MASK = [
   'places.id',
@@ -79,12 +80,17 @@ function normalizePlace(place, { category, zone, scrapeJobId }) {
   const city   = pickLocality(place.addressComponents);
   const country = pickCountry(place.addressComponents);
 
+  const website =
+    place.websiteUri ||
+    place.websiteURI ||
+    null;
+
   return {
     name:    name || null,
     phone:   phone || null,
     phoneRaw: place.internationalPhoneNumber || place.nationalPhoneNumber || null,
     address: place.formattedAddress || null,
-    website: place.websiteUri || null,
+    website,
     rating:  typeof place.rating === 'number' ? place.rating : null,
     reviews: typeof place.userRatingCount === 'number' ? place.userRatingCount : null,
     lat:     place.location?.latitude ?? null,
@@ -197,6 +203,91 @@ async function searchPlaces({
   return places;
 }
 
+function placeIdPathSegment(id) {
+  if (!id) return null;
+  let s = String(id).trim();
+  if (s.startsWith('places/')) s = s.slice('places/'.length);
+  return s || null;
+}
+
+/**
+ * Place Details (New) — fills websiteUri when Text Search omitted it.
+ * @see https://developers.google.com/maps/documentation/places/web-service/place-details
+ */
+async function fetchPlaceWebsiteUri(placeId, { signal, apiKey, onApiCall } = {}) {
+  const seg = placeIdPathSegment(placeId);
+  if (!seg) return null;
+  const key = apiKey || process.env.GOOGLE_PLACES_API_KEY;
+  if (!key) return null;
+
+  const url = `${PLACES_DETAIL_BASE}/${encodeURIComponent(seg)}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'GET',
+      signal,
+      headers: {
+        'X-Goog-Api-Key': key,
+        'X-Goog-FieldMask': 'websiteUri',
+      },
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError' || signal?.aborted) return null;
+    return null;
+  }
+
+  if (!res.ok) return null;
+  try {
+    onApiCall?.();
+  } catch (_) {}
+
+  const data = await res.json().catch(() => ({}));
+  return data.websiteUri || null;
+}
+
+/**
+ * Text Search often omits websiteUri; one Details request per missing place improves coverage.
+ * Disable with PLACES_WEBSITE_DETAILS_FALLBACK=0
+ */
+async function enrichLeadsMissingWebsite(leads, { signal, onApiCall } = {}) {
+  if (process.env.PLACES_WEBSITE_DETAILS_FALLBACK === '0' || !Array.isArray(leads)) {
+    return leads;
+  }
+
+  const concurrency = Math.max(
+    1,
+    Math.min(12, Number(process.env.PLACES_WEBSITE_DETAILS_CONCURRENCY || 6))
+  );
+  const cache = new Map();
+  const out = [];
+
+  async function uriFor(pid) {
+    if (cache.has(pid)) return cache.get(pid);
+    const u = await fetchPlaceWebsiteUri(pid, { signal, onApiCall });
+    cache.set(pid, u);
+    return u;
+  }
+
+  for (let i = 0; i < leads.length; i += concurrency) {
+    if (signal?.aborted) {
+      out.push(...leads.slice(i));
+      break;
+    }
+    const chunk = leads.slice(i, i + concurrency);
+    const resolved = await Promise.all(
+      chunk.map(async (lead) => {
+        if (lead.website || !lead.placeId || signal?.aborted) return lead;
+        const uri = await uriFor(lead.placeId);
+        if (uri) return { ...lead, website: uri };
+        return lead;
+      })
+    );
+    out.push(...resolved);
+  }
+
+  return out;
+}
+
 /**
  * searchLeads — high-level helper used by the scrape worker.
  * Returns phone-deduplicated, normalized leads ready for Mongo insert.
@@ -221,7 +312,7 @@ async function searchLeads({
 
   const seenPhone = new Set();
   const seenPlace = new Set();
-  const leads = [];
+  let leads = [];
 
   for (const p of raw) {
     const lead = normalizePlace(p, {
@@ -242,6 +333,8 @@ async function searchLeads({
     leads.push(lead);
   }
 
+  leads = await enrichLeadsMissingWebsite(leads, { signal, onApiCall });
+
   return { leads, raw, totalFound: raw.length };
 }
 
@@ -251,4 +344,6 @@ module.exports = {
   normalizePlace,
   normalizePhone,
   phoneKey,
+  fetchPlaceWebsiteUri,
+  enrichLeadsMissingWebsite,
 };

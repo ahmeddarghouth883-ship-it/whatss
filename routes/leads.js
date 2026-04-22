@@ -58,7 +58,7 @@ function csvEscape(v) {
 }
 
 function leadsToCsv(rows) {
-  const cols = ['name', 'phone', 'email', 'category', 'zone', 'city', 'address', 'website', 'rating', 'reviews', 'whatsappVerified', 'createdAt'];
+  const cols = ['name', 'phone', 'email', 'category', 'zone', 'city', 'address', 'website', 'websiteReachable', 'websiteHttpStatus', 'rating', 'reviews', 'whatsappVerified', 'createdAt'];
   const head = cols.join(',');
   const body = rows.map((r) => cols.map((c) => csvEscape(r[c])).join(',')).join('\n');
   return `${head}\n${body}\n`;
@@ -269,6 +269,9 @@ router.post('/export-excel', authenticate, async (req, res) => {
       { header: 'City', key: 'city', width: 18 },
       { header: 'Address', key: 'address', width: 36 },
       { header: 'Website', key: 'website', width: 32 },
+      { header: 'Website OK', key: 'websiteReachable', width: 12 },
+      { header: 'Website HTTP', key: 'websiteHttpStatus', width: 12 },
+      { header: 'Website checked', key: 'websiteCheckedAt', width: 20 },
       { header: 'Rating', key: 'rating', width: 10 },
       { header: 'Reviews', key: 'reviews', width: 10 },
       { header: 'WhatsApp verified', key: 'whatsappVerified', width: 18 },
@@ -292,6 +295,14 @@ router.post('/export-excel', authenticate, async (req, res) => {
         city: r.city || '',
         address: r.address || '',
         website: r.website || '',
+        websiteReachable:
+          r.website && typeof r.websiteReachable === 'boolean'
+            ? r.websiteReachable
+              ? 'Yes'
+              : 'No'
+            : '',
+        websiteHttpStatus: r.websiteHttpStatus != null ? r.websiteHttpStatus : '',
+        websiteCheckedAt: r.websiteCheckedAt ? new Date(r.websiteCheckedAt) : '',
         rating: r.rating ?? '',
         reviews: r.reviews ?? '',
         whatsappVerified: r.whatsappVerified ? 'Yes' : 'No',

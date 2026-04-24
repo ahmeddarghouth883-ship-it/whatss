@@ -7,7 +7,7 @@ import api from '../api/client'
 import { getRequestErrorMessage } from '../api/errors'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../contexts/ThemeContext'
-import GoogleSignInButton from '../components/GoogleSignInButton'
+import './register-page.css'
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation()
@@ -82,22 +82,9 @@ export default function LoginPage() {
     }
   }
 
-  async function onGoogleCredential(credential) {
-    setLoading(true)
-    try {
-      const res = await api.post('/auth/google', { credential })
-      login(res.data.token, res.data.user)
-      toast.success(`Welcome, ${res.data.user.name}!`)
-      navigate('/dashboard')
-    } catch (err) {
-      toast.error(getRequestErrorMessage(err, t, 'login.failed'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 px-4 py-6 sm:py-8">
+    <div className="auth-shell px-4 py-6 sm:py-8">
+      <div className="register-shell-inner flex flex-col min-h-screen">
       <div className="flex justify-end gap-2 mb-4 max-w-sm mx-auto w-full">
         <select
           id="login-language"
@@ -119,7 +106,7 @@ export default function LoginPage() {
           {theme === 'dark' ? '☀' : '☾'}
         </button>
       </div>
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center pb-8">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <h1 className="font-serif text-4xl text-gray-900 dark:text-gray-100 mb-1">
@@ -128,7 +115,7 @@ export default function LoginPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400">{t('login.subtitle')}</p>
           </div>
 
-          <div className="card p-6 sm:p-8">
+          <div className="card register-card p-6 sm:p-8">
             <h2 className="sr-only">{t('login.title')}</h2>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
@@ -168,11 +155,6 @@ export default function LoginPage() {
                 {loading ? t('common.loading') : t('login.submit')}
               </button>
 
-              <GoogleSignInButton
-                onCredential={onGoogleCredential}
-                disabled={loading}
-                theme={theme}
-              />
             </form>
           </div>
 
@@ -183,6 +165,7 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
+      </div>
       </div>
     </div>
   )

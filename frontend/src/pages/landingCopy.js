@@ -1,55 +1,3 @@
-const tickerEn = [
-  "Google Places extraction",
-  "WA number validation",
-  "Personalized campaigns",
-  "Shared reply inbox",
-  "Real-time analytics",
-  "Multi-session sending",
-  "Campaign scheduler",
-  "White-label reseller",
-  "Ban protection",
-  "Lead marketplace",
-];
-
-const tickerAr = [
-  "استخراج من محركات البحث",
-  "التحقق من أرقام واتساب",
-  "حملات مخصصة",
-  "صندوق وارد مشترك",
-  "تحليلات فورية",
-  "إرسال متعدد الجلسات",
-  "جدولة الحملات",
-  "إعادة بيع بالعلامة البيضاء",
-  "حماية من الحظر",
-  "سوق العملاء المحتملين",
-];
-
-const tickerFr = [
-  "Extraction Google Places",
-  "Validation des numéros WhatsApp",
-  "Campagnes personnalisées",
-  "Boîte de réception partagée",
-  "Analytique en temps réel",
-  "Envoi multi-sessions",
-  "Planificateur de campagnes",
-  "Revendeur en marque blanche",
-  "Protection contre le bannissement",
-  "Place de marché des leads",
-];
-
-const tickerIt = [
-  "Estrazione Google Places",
-  "Validazione numeri WhatsApp",
-  "Campagne personalizzate",
-  "Posta in arrivo condivisa",
-  "Analisi in tempo reale",
-  "Invio multi-sessione",
-  "Pianificazione campagne",
-  "Rivendita white-label",
-  "Protezione dal ban",
-  "Marketplace di lead",
-];
-
 export const landingCopy = {
   en: {
     nav: {
@@ -58,6 +6,13 @@ export const landingCopy = {
       pricing: "Pricing",
       signIn: "Sign in",
       getStarted: "Get started →",
+      menu: {
+        open: "Open menu",
+        close: "Close menu",
+        drawerTitle: "Menu",
+        explore: "Explore",
+        settings: "Appearance & language",
+      },
     },
     announce: {
       pre: "Free Trial",
@@ -71,7 +26,7 @@ export const landingCopy = {
       h1b: "pipeline",
       h1c: "of",
       h1d: "clients",
-      p: "Extract verified business contacts from Google Places, send personalized WhatsApp campaigns at scale, and close deals — all from one dashboard.",
+      p: "Find verified businesses on Google Places, reach them on WhatsApp with personalized campaigns, and handle replies as a team — one dashboard.",
       heroCta: "Get started — 20 credits",
       watchDemo: "See how it works ↓",
       emailPlaceholder: "you@company.com",
@@ -87,6 +42,14 @@ export const landingCopy = {
         { v: "94%", l: "delivery rate" },
         { v: "4.8/5", l: "average rating" },
       ],
+    },
+    caseStudy: {
+      lbl: "Customer story",
+      kicker: "B2B growth agency · Greater Tunis",
+      headline: "47 WhatsApp replies in under 24 hours",
+      quote:
+        "We sent 800 personalized WhatsApp messages to local restaurants on Monday. By Tuesday afternoon we had 47 replies and three new catering contracts.",
+      role: "— Digital marketing lead, Tunis",
     },
     comparison: {
       lbl: "Why WhispFlow",
@@ -125,10 +88,6 @@ export const landingCopy = {
           a: "Import a CSV with phone numbers in any common format. We deduplicate, validate against WhatsApp, and you're ready to send in under a minute." },
       ],
     },
-    guarantee: {
-      title: "Risk-free start",
-      points: ["7-day money-back on first pack", "No credit card for the Free Trial", "Cancel anytime — no contracts"],
-    },
     stickyCta: {
       msg: "Free Trial: 20 credits, no card",
       btn: "Start free →",
@@ -141,7 +100,6 @@ export const landingCopy = {
       m3: "I'll send you a quick demo 🚀",
       m4: "Perfect, send it over!",
     },
-    ticker: [...tickerEn, ...tickerEn],
     problem: {
       lbl1: "The problem",
       h2a: "Cold outreach",
@@ -218,8 +176,6 @@ export const landingCopy = {
       h2em: "what you send.",
       h2rest: "",
       monthlyPlansTitle: "Monthly plans",
-      monthlyPlansNote: "Same numbers power the app: message credits, extraction credits, and a safe daily WhatsApp cap per tier. Billed in TND; USD shown as reference.",
-      ctaFree: "Create account",
       tierPopular: "Popular",
       tierPerMonth: "/ month",
       tierCta: "Get started",
@@ -259,6 +215,13 @@ export const landingCopy = {
       pricing: "الأسعار",
       signIn: "تسجيل الدخول",
       getStarted: "ابدأ الآن →",
+      menu: {
+        open: "فتح القائمة",
+        close: "إغلاق القائمة",
+        drawerTitle: "القائمة",
+        explore: "استكشف",
+        settings: "المظهر واللغة",
+      },
     },
     announce: {
       pre: "تجربة مجانية",
@@ -272,7 +235,7 @@ export const landingCopy = {
       h1b: "خط عملاء",
       h1c: "من",
       h1d: "العملاء",
-      p: "استخرج جهات اتصال أعمال موثقة من محركات البحث، وأرسل حملات واتساب مخصصة على نطاق واسع، وأتمم الصفقات — كل ذلك من لوحة تحكم واحدة.",
+      p: "اعثر على أعمال موثقة من Google Places، وتواصل معها عبر واتساب بحملات مخصصة، وأدر الردود كفريق — من لوحة واحدة.",
       heroCta: "ابدأ الآن — 20 رصيداً",
       watchDemo: "شاهد كيف يعمل ↓",
       emailPlaceholder: "بريدك@الشركة.com",
@@ -288,6 +251,14 @@ export const landingCopy = {
         { v: "94%", l: "معدل التسليم" },
         { v: "4.8/5", l: "متوسط التقييم" },
       ],
+    },
+    caseStudy: {
+      lbl: "قصة عميل",
+      kicker: "وكالة نمو B2B · تونس الكبرى",
+      headline: "47 رداً على واتساب في أقل من 24 ساعة",
+      quote:
+        "أرسلنا 800 رسالة واتساب مخصصة لمطاعم محلية يوم الاثنين. بحلول بعد ظهر الثلاثاء كان لدينا 47 رداً وثلاثة عقود تموين جديدة.",
+      role: "— مسؤول تسويق رقمي، تونس",
     },
     comparison: {
       lbl: "لماذا WhispFlow",
@@ -326,10 +297,6 @@ export const landingCopy = {
           a: "استورد ملف CSV يحتوي على أرقام الهواتف بأي تنسيق شائع. نقوم بإزالة المكررات والتحقق من واتساب، وتكون جاهزاً للإرسال خلال أقل من دقيقة." },
       ],
     },
-    guarantee: {
-      title: "بداية بدون مخاطر",
-      points: ["استرداد 7 أيام على أول حزمة", "بدون بطاقة للتجربة المجانية", "إلغاء في أي وقت — بلا عقود"],
-    },
     stickyCta: {
       msg: "تجربة مجانية: 20 رصيداً، بدون بطاقة",
       btn: "ابدأ مجاناً →",
@@ -342,7 +309,6 @@ export const landingCopy = {
       m3: "سأرسل لك عرضاً سريعاً 🚀",
       m4: "ممتاز، أرسله إليّ.",
     },
-    ticker: [...tickerAr, ...tickerAr],
     problem: {
       lbl1: "المشكلة",
       h2a: "التواصل البارد",
@@ -419,8 +385,6 @@ export const landingCopy = {
       h2em: "ما ترسله.",
       h2rest: "",
       monthlyPlansTitle: "الخطط الشهرية",
-      monthlyPlansNote: "نفس الأرقام تشغّل التطبيق: رصيد الرسائل، رصيد الاستخراج، وحد يومي آمن لواتساب لكل مستوى. الفوترة بالدينار التونسي؛ USD للمرجع.",
-      ctaFree: "إنشاء حساب",
       tierPopular: "الأكثر شيوعاً",
       tierPerMonth: "/ شهر",
       tierCta: "ابدأ الآن",
@@ -460,6 +424,13 @@ export const landingCopy = {
       pricing: "Tarifs",
       signIn: "Connexion",
       getStarted: "Commencer →",
+      menu: {
+        open: "Ouvrir le menu",
+        close: "Fermer le menu",
+        drawerTitle: "Menu",
+        explore: "Explorer",
+        settings: "Apparence et langue",
+      },
     },
     announce: {
       pre: "Essai gratuit",
@@ -473,7 +444,7 @@ export const landingCopy = {
       h1b: "pipeline",
       h1c: "de",
       h1d: "clients",
-      p: "Extrayez des contacts professionnels vérifiés depuis les moteurs de recherche, envoyez des campagnes WhatsApp personnalisées à grande échelle et concluez des affaires — le tout depuis un seul tableau de bord.",
+      p: "Trouvez des entreprises vérifiées sur Google Places, engagez-les sur WhatsApp avec des campagnes personnalisées et gérez les réponses en équipe — depuis un seul tableau de bord.",
       heroCta: "Commencer — 20 crédits",
       watchDemo: "Voir comment ça marche ↓",
       emailPlaceholder: "vous@entreprise.com",
@@ -489,6 +460,14 @@ export const landingCopy = {
         { v: "94%", l: "taux de livraison" },
         { v: "4,8/5", l: "note moyenne" },
       ],
+    },
+    caseStudy: {
+      lbl: "Témoignage client",
+      kicker: "Agence de croissance B2B · Grand Tunis",
+      headline: "47 réponses WhatsApp en moins de 24 h",
+      quote:
+        "Nous avons envoyé 800 messages WhatsApp personnalisés à des restaurants locaux lundi. Mardi après-midi, nous avions 47 réponses et trois nouveaux contrats traiteur.",
+      role: "— Responsable marketing digital, Tunis",
     },
     comparison: {
       lbl: "Pourquoi WhispFlow",
@@ -527,10 +506,6 @@ export const landingCopy = {
           a: "Importez un CSV avec les numéros dans n'importe quel format courant. On déduplique, on valide sur WhatsApp, vous êtes prêt à envoyer en moins d'une minute." },
       ],
     },
-    guarantee: {
-      title: "Démarrage sans risque",
-      points: ["Garantie 7 jours sur le 1er pack", "Sans carte pour l'essai gratuit", "Annulable à tout moment — pas d'engagement"],
-    },
     stickyCta: {
       msg: "Essai gratuit : 20 crédits, sans carte",
       btn: "Commencer gratuit →",
@@ -543,7 +518,6 @@ export const landingCopy = {
       m3: "Je vous envoie une courte démo 🚀",
       m4: "Parfait, envoyez-la !",
     },
-    ticker: [...tickerFr, ...tickerFr],
     problem: {
       lbl1: "Le problème",
       h2a: "La prospection froide",
@@ -620,8 +594,6 @@ export const landingCopy = {
       h2em: "ce que vous envoyez.",
       h2rest: "",
       monthlyPlansTitle: "Forfaits mensuels",
-      monthlyPlansNote: "Les mêmes chiffres dans l'app : crédits messages, crédits d'extraction, et plafond WhatsApp quotidien par palier. Facturation en TND ; USD indicatif.",
-      ctaFree: "Créer un compte",
       tierPopular: "Populaire",
       tierPerMonth: "/ mois",
       tierCta: "Commencer",
@@ -661,6 +633,13 @@ export const landingCopy = {
       pricing: "Prezzi",
       signIn: "Accedi",
       getStarted: "Inizia →",
+      menu: {
+        open: "Apri menu",
+        close: "Chiudi menu",
+        drawerTitle: "Menu",
+        explore: "Esplora",
+        settings: "Aspetto e lingua",
+      },
     },
     announce: {
       pre: "Prova gratis",
@@ -674,7 +653,7 @@ export const landingCopy = {
       h1b: "pipeline",
       h1c: "di",
       h1d: "clienti",
-      p: "Estrai contatti aziendali verificati dai motori di ricerca, invia campagne WhatsApp personalizzate su larga scala e chiudi accordi — tutto da un'unica dashboard.",
+      p: "Trova attività verificate su Google Places, raggiungile su WhatsApp con campagne personalizzate e gestisci le risposte in team — da un’unica dashboard.",
       heroCta: "Inizia — 20 crediti",
       watchDemo: "Vedi come funziona ↓",
       emailPlaceholder: "tu@azienda.com",
@@ -690,6 +669,14 @@ export const landingCopy = {
         { v: "94%", l: "tasso consegna" },
         { v: "4,8/5", l: "valutazione media" },
       ],
+    },
+    caseStudy: {
+      lbl: "Storia cliente",
+      kicker: "Agenzia growth B2B · Grande Tunisi",
+      headline: "47 risposte WhatsApp in meno di 24 ore",
+      quote:
+        "Lunedì abbiamo inviato 800 messaggi WhatsApp personalizzati a ristoranti locali. Martedì pomeriggio avevamo 47 risposte e tre nuovi contratti catering.",
+      role: "— Lead marketing digitale, Tunisi",
     },
     comparison: {
       lbl: "Perché WhispFlow",
@@ -728,10 +715,6 @@ export const landingCopy = {
           a: "Importa un CSV con i numeri in qualsiasi formato comune. Deduplichiamo, validiamo su WhatsApp, sei pronto a inviare in meno di un minuto." },
       ],
     },
-    guarantee: {
-      title: "Inizio senza rischio",
-      points: ["Rimborso 7 giorni sul 1° pacchetto", "Senza carta per la prova gratis", "Annullabile sempre — nessun contratto"],
-    },
     stickyCta: {
       msg: "Prova gratis: 20 crediti, senza carta",
       btn: "Inizia gratis →",
@@ -744,7 +727,6 @@ export const landingCopy = {
       m3: "Ti mando una demo veloce 🚀",
       m4: "Perfetto, mandala!",
     },
-    ticker: [...tickerIt, ...tickerIt],
     problem: {
       lbl1: "Il problema",
       h2a: "Il cold outreach",
@@ -821,8 +803,6 @@ export const landingCopy = {
       h2em: "ciò che invii.",
       h2rest: "",
       monthlyPlansTitle: "Piani mensili",
-      monthlyPlansNote: "Stessi numeri nell'app: crediti messaggi, crediti estrazione e tetto giornaliero WhatsApp per piano. Fatturazione in TND; USD come riferimento.",
-      ctaFree: "Crea account",
       tierPopular: "Consigliato",
       tierPerMonth: "/ mese",
       tierCta: "Inizia",

@@ -7,7 +7,7 @@ import api from '../api/client'
 import { getRequestErrorMessage } from '../api/errors'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../contexts/ThemeContext'
-import GoogleSignInButton from '../components/GoogleSignInButton'
+import { track } from '../utils/analytics'
 import './register-page.css'
 
 export default function RegisterPage() {
@@ -40,6 +40,10 @@ export default function RegisterPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const isRtl = (i18n.language || '').startsWith('ar')
+
+  useEffect(() => {
+    track('register_view', { has_prefill: !!prefilledEmail })
+  }, [prefilledEmail])
 
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -109,20 +113,6 @@ export default function RegisterPage() {
 
       toast.success(res?.data?.message || 'Account registered successfully. You can now log in.')
       navigate('/login')
-    } catch (err) {
-      toast.error(getRequestErrorMessage(err, t, 'register.failed'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function onGoogleCredential(credential) {
-    setLoading(true)
-    try {
-      const res = await api.post('/auth/google', { credential })
-      login(res.data.token, res.data.user)
-      toast.success(t('register.success'))
-      navigate('/dashboard')
     } catch (err) {
       toast.error(getRequestErrorMessage(err, t, 'register.failed'))
     } finally {
@@ -251,15 +241,10 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-3 rounded-xl shadow-lg shadow-green-600/20">
+                <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-3">
                   {loading ? t('register.submitLoading') : t('register.submit')}
                 </button>
 
-                <GoogleSignInButton
-                  onCredential={onGoogleCredential}
-                  disabled={loading}
-                  theme={theme}
-                />
               </form>
             ) : (
               <form onSubmit={onVerifyCode} className="space-y-4">

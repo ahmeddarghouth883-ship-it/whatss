@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { useTranslation } from 'react-i18next'
@@ -308,8 +308,35 @@ export default function Layout() {
         )}
 
         {/* Page content — padded bottom on mobile to clear the bottom nav */}
-        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0 bg-gray-50 dark:bg-gray-950">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0 bg-gray-50 dark:bg-gray-950 flex flex-col min-h-0">
+          <div className="flex-1 min-h-0 min-w-0">
+            <Outlet />
+          </div>
+          <footer className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 bg-gray-50/90 dark:bg-gray-950/90 px-4 py-2.5">
+            <nav
+              className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-gray-500 dark:text-gray-400"
+              aria-label={t('layout.legalNavAria')}
+            >
+              <Link
+                to="/privacy"
+                className="hover:text-gray-800 dark:hover:text-gray-200 underline-offset-2 hover:underline"
+              >
+                {t('layout.privacyLink')}
+              </Link>
+              <Link
+                to="/terms"
+                className="hover:text-gray-800 dark:hover:text-gray-200 underline-offset-2 hover:underline"
+              >
+                {t('layout.termsLink')}
+              </Link>
+              <Link
+                to="/contact"
+                className="hover:text-gray-800 dark:hover:text-gray-200 underline-offset-2 hover:underline"
+              >
+                {t('layout.contactLink')}
+              </Link>
+            </nav>
+          </footer>
         </main>
       </div>
 

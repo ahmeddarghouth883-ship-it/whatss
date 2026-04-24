@@ -36,7 +36,11 @@
     "extractingFound": "Extracting… {{n}} found",
     "savingLeads": "Saving… {{saved}}/{{total}}",
     "runsInBackground": "Runs in background — safe to navigate",
-    "coolingPause": "Paused until {{time}} (rate limit)"
+    "coolingPause": "Paused until {{time}} (rate limit)",
+    "legalNavAria": "Legal and contact",
+    "privacyLink": "Privacy",
+    "termsLink": "Terms",
+    "contactLink": "Contact"
   },
   "dashboard": {
     "greeting": "Good morning, {{name}}",

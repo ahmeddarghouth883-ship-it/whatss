@@ -10,6 +10,7 @@ import LoginPage       from './pages/LoginPage'
 import RegisterPage    from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LandingPage     from './pages/LandingPage'
+import PublicInfoPage  from './pages/PublicInfoPage'
 import Dashboard       from './pages/Dashboard'
 import ScrapePage      from './pages/ScrapePage'
 import LeadsPage       from './pages/LeadsPage'
@@ -71,6 +72,10 @@ export default function App() {
             <Route path="/login"    element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+            <Route path="/privacy" element={<PublicInfoPage page="privacy" />} />
+            <Route path="/terms" element={<PublicInfoPage page="terms" />} />
+            <Route path="/contact" element={<PublicInfoPage page="contact" />} />
 
             {/* App (protected) — single Layout instance shared across all app routes */}
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

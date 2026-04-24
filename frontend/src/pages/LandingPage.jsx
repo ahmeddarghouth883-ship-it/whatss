@@ -1,31 +1,16 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sun, Moon, Languages } from 'lucide-react';
+import { Sun, Moon, Languages, Menu, X } from 'lucide-react';
 import { WhispFlowAnimatedLogo } from '../components/WhispFlowAnimatedLogo';
 import { WhispFlowWfMark } from '../components/WhispFlowWfMark';
 import { useTheme } from '../contexts/ThemeContext';
 import { landingCopy } from './landingCopy';
 import api from '../api/client';
+import { track } from '../utils/analytics';
 import './landing.css';
 
 // Mirrors helpers/seedPlans.js — used as a fallback if /api/plans is offline.
 const FALLBACK_PLANS = [
-  {
-    code:     'free_trial',
-    label:    'Free Trial',
-    blurb:    '20 credits to try the platform. No card required, never renews.',
-    priceUsd: 0,
-    priceTnd: 0,
-    credits:  20,
-    isCustom: false,
-    oneTime:  true,
-    features: [
-      '20 credits total (one-time)',
-      '20 lead extractions OR 40 messages',
-      'Full access to all features',
-      'No payment method required',
-    ],
-  },
   {
     code:     'basic',
     label:    'Basic',
@@ -77,6 +62,18 @@ const FALLBACK_PLANS = [
       'SLA & onboarding support',
     ],
   },
+];
+
+/** Partner marquee + stable order for assets */
+const TICKER_PARTNER_SRCS = [
+  '/partners/google-cloud.png',
+  '/partners/truecost.png',
+  '/partners/only-tourism.png',
+  '/partners/dada-rent-car.png',
+  '/partners/pieces-auto-expert.png',
+  '/partners/whatsapp-business.png',
+  '/partners/zabeel-travel.png',
+  '/partners/al-naqaba.png',
 ];
 
 function useDocumentDark() {
@@ -136,11 +133,14 @@ export default function LandingPage() {
   const ctrRef = useRef(null);
   const numsRef = useRef(null);
   const hasAnimated = useRef(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   function submitHeroEmail(e) {
     e?.preventDefault?.();
     const email = String(heroEmail || '').trim();
-    if (email && /\S+@\S+\.\S+/.test(email)) {
+    const hasEmail = !!(email && /\S+@\S+\.\S+/.test(email));
+    track('landing_hero_email_submit', { has_email: hasEmail });
+    if (hasEmail) {
       navigate(`/register?email=${encodeURIComponent(email)}`);
     } else {
       navigate('/register');
@@ -201,6 +201,24 @@ export default function LandingPage() {
     return () => numObs.disconnect();
   }, [countUp]);
 
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
   const logoSurface = isDark ? 'dark' : 'light';
 
   // Build FAQ structured data once per render
@@ -236,59 +254,87 @@ export default function LandingPage() {
       />
 
       {/* NAV */}
-      <nav className="lnav">
+      <nav className="lnav" aria-label="Primary">
         <div className="nav-logo">
           <WhispFlowWfMark height={36} />
         </div>
-        <ul className="nav-links">
-          <li><a href="#how">{t.nav.how}</a></li>
-          <li><a href="#features">{t.nav.features}</a></li>
-          <li><a href="#pricing">{t.nav.pricing}</a></li>
-        </ul>
-        <div className="nav-r landing-nav-tools">
-          <div style={{ marginRight: 'clamp(12px,3vw,24px)', display: 'flex', alignItems: 'center' }}>
-            <img
-              src="/Madein-Tunisia-Logo1.png"
-              alt="Made in Tunisia"
-              style={{
-                height: 'clamp(50px,8vh,64px)',
-                width: 'auto',
-                maxWidth: 180,
-                objectFit: 'contain',
-                transform: 'scale(1.3)',
-                transformOrigin: 'center right',
-                filter: isDark
-                  ? 'drop-shadow(0 0 12px rgba(255,255,255,0.3)) brightness(1.1)'
-                  : 'drop-shadow(0 2px 8px rgba(0,0,0,0.15))',
-              }}
-            />
-          </div>
+        <div className="nav-r lnav-actions">
+          <Link to="/login" className="btn-ghost" onClick={() => setMenuOpen(false)}>{t.nav.signIn}</Link>
+          <Link
+            to="/register"
+            className="btn-green"
+            onClick={() => {
+              setMenuOpen(false);
+              track('landing_nav_register', { source: 'nav' });
+            }}
+          >
+            {t.nav.getStarted}
+          </Link>
           <button
             type="button"
-            className="btn-ghost landing-icon-btn"
-            aria-label={isDark ? 'Light mode' : 'Dark mode'}
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            className="btn-ghost landing-icon-btn lnav-menu-btn"
+            aria-expanded={menuOpen}
+            aria-haspopup="dialog"
+            aria-controls={menuOpen ? 'landing-nav-drawer' : undefined}
+            aria-label={menuOpen ? t.nav.menu.close : t.nav.menu.open}
+            onClick={() => setMenuOpen((o) => !o)}
           >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            {menuOpen ? <X size={22} strokeWidth={2} aria-hidden /> : <Menu size={22} strokeWidth={2} aria-hidden />}
           </button>
-          <div className="btn-ghost landing-icon-btn landing-lang-wrap">
-            <Languages size={16} className="landing-lang-icon" aria-hidden />
-            <select
-              className="landing-lang-select"
-              aria-label="Language"
-              value={lang}
-              onChange={(e) => setLandingLang(e.target.value)}
-            >
-              <option value="en">EN</option>
-              <option value="fr">FR</option>
-              <option value="it">IT</option>
-              <option value="ar">عربي</option>
-            </select>
-          </div>
-          <Link to="/login" className="btn-ghost">{t.nav.signIn}</Link>
-          <Link to="/register" className="btn-green">{t.nav.getStarted}</Link>
         </div>
       </nav>
+
+      {menuOpen ? (
+        <div className="landing-drawer-root">
+          <div
+            className="landing-drawer-backdrop"
+            aria-hidden
+            onClick={() => setMenuOpen(false)}
+          />
+          <div
+            id="landing-nav-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.nav.menu.drawerTitle}
+            className="landing-drawer-panel"
+          >
+            <div className="landing-drawer-scroll">
+              <div className="landing-drawer-section-label">{t.nav.menu.explore}</div>
+              <ul className="landing-drawer-explore-list">
+                <li><a href="#how" onClick={() => setMenuOpen(false)}>{t.nav.how}</a></li>
+                <li><a href="#features" onClick={() => setMenuOpen(false)}>{t.nav.features}</a></li>
+                <li><a href="#pricing" onClick={() => setMenuOpen(false)}>{t.nav.pricing}</a></li>
+              </ul>
+
+              <div className="landing-drawer-section-label">{t.nav.menu.settings}</div>
+              <div className="landing-drawer-settings landing-nav-tools">
+                <button
+                  type="button"
+                  className="btn-ghost landing-icon-btn"
+                  aria-label={isDark ? 'Light mode' : 'Dark mode'}
+                  onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                >
+                  {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+                <div className="btn-ghost landing-icon-btn landing-lang-wrap">
+                  <Languages size={16} className="landing-lang-icon" aria-hidden />
+                  <select
+                    className="landing-lang-select"
+                    aria-label="Language"
+                    value={lang}
+                    onChange={(e) => setLandingLang(e.target.value)}
+                  >
+                    <option value="en">EN</option>
+                    <option value="fr">FR</option>
+                    <option value="it">IT</option>
+                    <option value="ar">عربي</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* HERO */}
       <div style={{ position: 'relative', zIndex: 1, paddingTop: 66 }}>
@@ -310,25 +356,27 @@ export default function LandingPage() {
             </h1>
             <p className="hero-p">{t.hero.p}</p>
 
-            {/* Inline email capture — converts much better than a "register" link */}
-            <form className="hero-email-form" onSubmit={submitHeroEmail} noValidate>
-              <input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                className="hero-email-input"
-                placeholder={t.hero.emailPlaceholder}
-                value={heroEmail}
-                onChange={(e) => setHeroEmail(e.target.value)}
-                aria-label="Email"
-              />
-              <button type="submit" className="btn-primary hero-email-btn">
-                {t.hero.heroCta}
-                <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
-                  <path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </form>
+            {/* Inline email capture — gradient shell inspired by Uiverse-style premium CTAs */}
+            <div className="hero-email-shell">
+              <form className="hero-email-form" onSubmit={submitHeroEmail} noValidate>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  className="hero-email-input"
+                  placeholder={t.hero.emailPlaceholder}
+                  value={heroEmail}
+                  onChange={(e) => setHeroEmail(e.target.value)}
+                  aria-label="Email"
+                />
+                <button type="submit" className="btn-primary hero-email-btn">
+                  {t.hero.heroCta}
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
+                    <path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </form>
+            </div>
             <p className="hero-microcopy">{t.hero.microcopy}</p>
 
             <div className="hero-btns hero-btns-secondary">
@@ -395,13 +443,14 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* TICKER */}
-      <div className="ticker-wrap">
+      {/* TICKER — partner logos (duplicated for seamless loop) */}
+      <div className="ticker-wrap" aria-hidden>
         <div className="ticker-inner">
-          {t.ticker.map((text, i) => (
-            <div className="ti" key={i}>
-              <div className="td"></div>
-              {text}
+          {[...TICKER_PARTNER_SRCS, ...TICKER_PARTNER_SRCS].map((src, i) => (
+            <div className="ti ti-partner" key={i}>
+              <span className="ticker-logo-thumb">
+                <img src={src} alt="" width={120} height={40} loading="lazy" decoding="async" />
+              </span>
             </div>
           ))}
         </div>
@@ -421,6 +470,21 @@ export default function LandingPage() {
                 <div className="lp-proof-l">{c.l}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CASE STUDY / PROOF */}
+      <section className="sec lp-case-study-sec" aria-labelledby="case-study-heading">
+        <div className="inner">
+          <div className="lp-case-study rv">
+            <div className="lbl">{t.caseStudy.lbl}</div>
+            <p className="lp-case-study-kicker">{t.caseStudy.kicker}</p>
+            <h2 id="case-study-heading" className="disp lp-case-study-head">
+              {t.caseStudy.headline}
+            </h2>
+            <blockquote className="lp-case-study-quote">{t.caseStudy.quote}</blockquote>
+            <cite className="lp-case-study-role">{t.caseStudy.role}</cite>
           </div>
         </div>
       </section>
@@ -565,7 +629,7 @@ export default function LandingPage() {
             </h2>
           </div>
           <div className="feat-g rv2">
-            <div className="fc">
+            <div className="fc" id="landing-feat-places">
               <div className="fi">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8" stroke="#16a34a" strokeWidth="1.5" />
@@ -575,7 +639,7 @@ export default function LandingPage() {
               <div className="ft">{t.features.items[0].t}</div>
               <div className="fd">{t.features.items[0].d}</div>
             </div>
-            <div className="fc">
+            <div className="fc" id="landing-feat-wa">
               <div className="fi">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path d="M9 12l2 2 4-4" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -585,7 +649,7 @@ export default function LandingPage() {
               <div className="ft">{t.features.items[1].t}</div>
               <div className="fd">{t.features.items[1].d}</div>
             </div>
-            <div className="fc">
+            <div className="fc" id="landing-feat-campaign">
               <div className="fi">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#16a34a" strokeWidth="1.5" strokeLinejoin="round" />
@@ -594,7 +658,7 @@ export default function LandingPage() {
               <div className="ft">{t.features.items[2].t}</div>
               <div className="fd"><CampaignFeatureD text={t.features.items[2].d} /></div>
             </div>
-            <div className="fc">
+            <div className="fc" id="landing-feat-analytics">
               <div className="fi">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <rect x="2" y="3" width="20" height="14" rx="2" stroke="#16a34a" strokeWidth="1.5" />
@@ -637,7 +701,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className="fc">
+            <div className="fc" id="landing-feat-inbox">
               <div className="fi">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" />
@@ -648,7 +712,7 @@ export default function LandingPage() {
               <div className="ft">{t.features.items[4].t}</div>
               <div className="fd">{t.features.items[4].d}</div>
             </div>
-            <div className="fc">
+            <div className="fc" id="landing-feat-protection">
               <div className="fi">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#16a34a" strokeWidth="1.5" strokeLinejoin="round" />
@@ -671,35 +735,17 @@ export default function LandingPage() {
                 {t.pricing.h2a}<br />
                 <span>{t.pricing.h2em}</span> {t.pricing.h2rest}
               </h2>
-              <p className="pricing-subtitle">{t.pricing.monthlyPlansNote}</p>
-            </div>
-            <div className="lp-guarantee" aria-label={t.guarantee.title}>
-              <div className="lp-guarantee-title">{t.guarantee.title}</div>
-              <ul className="lp-guarantee-list">
-                {t.guarantee.points.map((p, i) => (
-                  <li key={i}>
-                    <span className="lp-guarantee-tick" aria-hidden>
-                      <svg viewBox="0 0 12 9" width="11" height="9">
-                        <polyline points="1 4.5 4.5 8 11 1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                    {p}
-                  </li>
-                ))}
-              </ul>
             </div>
             <div className="pricing-grid">
-              {plansToRender.map((plan) => {
+              {plansToRender
+                .filter((plan) => (plan.code || plan.id) !== 'free_trial')
+                .map((plan) => {
                 const code = plan.code || plan.id;
                 const isPopular = code === 'pro';
-                const isFree    = code === 'free_trial';
                 const isCustom  = !!plan.isCustom || code === 'enterprise';
 
                 let ctaTo, ctaLabel;
-                if (isFree) {
-                  ctaTo    = '/register';
-                  ctaLabel = t.pricing.ctaFree;
-                } else if (isCustom) {
+                if (isCustom) {
                   ctaTo    = `/wallet?plan=${encodeURIComponent(code)}`;
                   ctaLabel = 'Contact us';
                 } else {
@@ -748,6 +794,13 @@ export default function LandingPage() {
                     <Link
                       to={ctaTo}
                       className={`plan-cta${isPopular ? ' plan-cta-primary' : ' plan-cta-outline'}`}
+                      onClick={() =>
+                        track('landing_pricing_cta', {
+                          plan_code: code,
+                          popular: isPopular,
+                          custom: isCustom,
+                        })
+                      }
                     >
                       {ctaLabel}
                     </Link>
@@ -834,7 +887,11 @@ export default function LandingPage() {
             }
           </h2>
           <p>{t.cta.p}</p>
-          <Link to="/register" className="btn-white">
+          <Link
+            to="/register"
+            className="btn-white"
+            onClick={() => track('landing_nav_register', { source: 'footer_cta' })}
+          >
             {t.cta.btn}
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
               <path d="M5 12h14M13 6l6 6-6 6" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -850,11 +907,33 @@ export default function LandingPage() {
           <WhispFlowWfMark height={28} />
         </div>
         <div className="foot-links">
-          <a href="#">{t.footer.privacy}</a>
-          <a href="#">{t.footer.terms}</a>
-          <a href="#">{t.footer.contact}</a>
+          <Link to="/privacy">{t.footer.privacy}</Link>
+          <Link to="/terms">{t.footer.terms}</Link>
+          <Link to="/contact">{t.footer.contact}</Link>
         </div>
-        <div className="foot-copy">{t.footer.copy}</div>
+        <div className="foot-trailing">
+          <div className="foot-badges">
+            <img
+              src="/iso-27001-certified.svg"
+              alt="ISO 27001 certified"
+              className="foot-cert-img"
+              width={295}
+              height={111}
+              loading="lazy"
+              decoding="async"
+            />
+            <img
+              src="/Madein-Tunisia-Logo1.png"
+              alt="Made in Tunisia"
+              className="foot-made-in-img"
+              width={200}
+              height={60}
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <div className="foot-copy">{t.footer.copy}</div>
+        </div>
       </div>
     </div>
   );

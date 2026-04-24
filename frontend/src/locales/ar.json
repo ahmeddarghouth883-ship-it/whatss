@@ -36,7 +36,11 @@
     "extractingFound": "تم استخراج... {{n}}",
     "savingLeads": "جاري الحفظ... {{saved}}/{{total}}",
     "runsInBackground": "تعمل العمليات في الخلفية — يمكنك التنقل بحرية",
-    "coolingPause": "متوقف حتى {{time}} (حد الإرسال)"
+    "coolingPause": "متوقف حتى {{time}} (حد الإرسال)",
+    "legalNavAria": "قانوني واتصال",
+    "privacyLink": "الخصوصية",
+    "termsLink": "الشروط",
+    "contactLink": "اتصل بنا"
   },
   "dashboard": {
     "greeting": "صباح الخير، {{name}}",

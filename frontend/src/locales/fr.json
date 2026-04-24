@@ -36,7 +36,11 @@
     "extractingFound": "Extraction… {{n}} trouvés",
     "savingLeads": "Enregistrement… {{saved}}/{{total}}",
     "runsInBackground": "Continue en arrière-plan — navigation sûre",
-    "coolingPause": "Pause jusqu'à {{time}} (limite de débit)"
+    "coolingPause": "Pause jusqu'à {{time}} (limite de débit)",
+    "legalNavAria": "Légal et contact",
+    "privacyLink": "Confidentialité",
+    "termsLink": "Conditions",
+    "contactLink": "Contact"
   },
   "dashboard": {
     "greeting": "Bonjour, {{name}}",

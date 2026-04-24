@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGoogleMaps } from '../hooks/useGoogleMaps'
-import api from '../api/client'
 
 const DEFAULT_CENTER = { lat: 36.8065, lng: 10.1815 } // Tunis
 
@@ -16,7 +15,7 @@ const DEFAULT_CENTER = { lat: 36.8065, lng: 10.1815 } // Tunis
  *   onChange: (next) => void
  */
 export default function PlacesMapPicker({ value, onChange, className = '' }) {
-  const { google, ready, error } = useGoogleMaps(['places'])
+  const { google, ready, error } = useGoogleMaps(['places', 'marker'])
   const mapDivRef     = useRef(null)
   const searchInputRef = useRef(null)
   const searchControlRef = useRef(null)
@@ -31,8 +30,6 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
   ))
   const [radius, setRadius] = useState(value?.radius ?? 2500)
   const [address, setAddress] = useState(value?.address || '')
-  const [showHeatmap, setShowHeatmap] = useState(false)
-  const heatmapRef = useRef(null)
 
   // ── Init map once Google is ready ─────────────────────────────────────────
   useEffect(() => {
@@ -119,15 +116,33 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
     setCenter(pos)
 
     if (!markerRef.current) {
-      markerRef.current = new g.maps.Marker({
-        position: pos, map, draggable: true,
-        title: 'Drag to adjust the zone center',
-      })
-      markerRef.current.addListener('dragend', (e) => {
-        placeAt(e.latLng.lat(), e.latLng.lng(), { reverseGeocode: true })
-      })
-    } else {
+      const AdvancedMarker = g.maps?.marker?.AdvancedMarkerElement
+      if (AdvancedMarker) {
+        markerRef.current = new AdvancedMarker({
+          position: pos,
+          map,
+          gmpDraggable: true,
+          title: 'Drag to adjust the zone center',
+        })
+        markerRef.current.addListener('dragend', (e) => {
+          const p = e?.latLng || markerRef.current?.position
+          if (!p?.lat || !p?.lng) return
+          placeAt(p.lat(), p.lng(), { reverseGeocode: true })
+        })
+      } else {
+        // Fallback for older map payloads where AdvancedMarkerElement is unavailable.
+        markerRef.current = new g.maps.Marker({
+          position: pos, map, draggable: true,
+          title: 'Drag to adjust the zone center',
+        })
+        markerRef.current.addListener('dragend', (e) => {
+          placeAt(e.latLng.lat(), e.latLng.lng(), { reverseGeocode: true })
+        })
+      }
+    } else if (typeof markerRef.current.setPosition === 'function') {
       markerRef.current.setPosition(pos)
+    } else {
+      markerRef.current.position = pos
     }
 
     if (!circleRef.current) {
@@ -146,7 +161,10 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
         const c = circleRef.current.getCenter()
         if (!c) return
         const next = { lat: c.lat(), lng: c.lng() }
-        if (markerRef.current) markerRef.current.setPosition(next)
+        if (markerRef.current) {
+          if (typeof markerRef.current.setPosition === 'function') markerRef.current.setPosition(next)
+          else markerRef.current.position = next
+        }
         setCenter(next)
         emitChange({ lat: next.lat, lng: next.lng, reverseGeocode: true })
       })
@@ -180,52 +198,6 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
     if (next.lat == null || next.lng == null) return
     onChange?.(next)
   }
-
-  // ── Heatmap of existing user leads ────────────────────────────────────────
-  async function loadHeatmap() {
-    const g = google || window.google
-    const map = mapRef.current
-    if (!g || !map) return
-    if (!g.maps?.visualization && typeof g.maps?.importLibrary === 'function') {
-      try {
-        await g.maps.importLibrary('visualization')
-      } catch (_) {
-        return
-      }
-    }
-    if (!g.maps?.visualization) return
-    if (heatmapRef.current) {
-      heatmapRef.current.setMap(null)
-      heatmapRef.current = null
-    }
-    try {
-      // Pull up to 1000 leads for the user; we don't have lat/lng on Lead
-      // (only address) so we approximate by reusing the search center.
-      // For now, geocode-on-demand would be expensive; we simply show the
-      // markers we DO have geo data for via /scrape/jobs (each job has lat/lng/radius).
-      const r = await api.get('/scrape/jobs')
-      const points = []
-      for (const j of (r.data?.jobs || [])) {
-        if (typeof j?.lat === 'number' && typeof j?.lng === 'number' && j?.saved > 0) {
-          // Weight roughly by saved leads at the job center
-          points.push({ location: new g.maps.LatLng(j.lat, j.lng), weight: Math.min(50, j.saved) })
-        }
-      }
-      if (points.length === 0) return
-      heatmapRef.current = new g.maps.visualization.HeatmapLayer({
-        data: points, map, radius: 40, opacity: 0.65,
-      })
-    } catch (_) { /* ignore */ }
-  }
-
-  useEffect(() => {
-    if (!showHeatmap) {
-      if (heatmapRef.current) { heatmapRef.current.setMap(null); heatmapRef.current = null }
-      return
-    }
-    loadHeatmap()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHeatmap, ready])
 
   // ── Radius slider updates the circle ──────────────────────────────────────
   function handleRadiusChange(e) {
@@ -310,17 +282,13 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
         </div>
       </div>
 
-      {/* Selection summary + heatmap toggle */}
+      {/* Selection summary */}
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-gray-500 dark:text-gray-400 font-mono break-words flex-1 min-w-0">
           {center
             ? <>📍 {center.lat.toFixed(5)}, {center.lng.toFixed(5)} {address && <>— {address}</>}</>
             : <>Click on the map to drop the zone center, or search an address above.</>}
         </div>
-        <label className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
-          <input type="checkbox" checked={showHeatmap} onChange={e => setShowHeatmap(e.target.checked)} className="rounded" />
-          Heatmap
-        </label>
       </div>
     </div>
   )

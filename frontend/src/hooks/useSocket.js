@@ -12,7 +12,6 @@ const noopSocket = {
 
 const baseOptions = {
   path: '/socket.io',
-  transports: ['websocket', 'polling'],
   autoConnect: true
 }
 
@@ -26,7 +25,15 @@ function getSocketOptions() {
   if (!import.meta.env.DEV) {
     return {
       url: origin,
-      options: { ...baseOptions, reconnection: true, reconnectionAttempts: 8, reconnectionDelay: 1000 }
+      // In production behind reverse proxies, polling is more resilient than direct websocket upgrades.
+      options: {
+        ...baseOptions,
+        transports: ['polling'],
+        upgrade: false,
+        reconnection: true,
+        reconnectionAttempts: 8,
+        reconnectionDelay: 1000,
+      }
     }
   }
 
@@ -38,6 +45,7 @@ function getSocketOptions() {
       url,
       options: {
         ...baseOptions,
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: 8,
         reconnectionDelay: 1000
@@ -48,7 +56,13 @@ function getSocketOptions() {
   // Dev with UI already on :5000 (unusual)
   return {
     url: origin,
-    options: { ...baseOptions, reconnection: true, reconnectionAttempts: 8, reconnectionDelay: 1000 }
+    options: {
+      ...baseOptions,
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 8,
+      reconnectionDelay: 1000,
+    }
   }
 }
 

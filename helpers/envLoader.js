@@ -20,6 +20,7 @@ const path = require('path');
 function canonicalKey(raw) {
   const trimmed = String(raw || '').trim();
   if (/google\s*place/i.test(trimmed)) return 'GOOGLE_PLACES_API_KEY';
+  if (/google\s*maps/i.test(trimmed)) return 'GOOGLE_MAPS_API_KEY';
   if (/google/i.test(trimmed) && /client/i.test(trimmed) && /id/i.test(trimmed)) {
     return 'GOOGLE_CLIENT_ID';
   }

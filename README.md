@@ -12,6 +12,12 @@ Create or edit `env/logs` at the repo root:
 Google Place API=YOUR_GOOGLE_API_KEY_HERE
 ```
 
+If you want to use a separate browser key for the map picker, you can also set:
+
+```
+Google Maps API=YOUR_GOOGLE_MAPS_API_KEY_HERE
+```
+
 In the [Google Cloud Console](https://console.cloud.google.com/) enable
 **both** of these APIs on the key's project:
 

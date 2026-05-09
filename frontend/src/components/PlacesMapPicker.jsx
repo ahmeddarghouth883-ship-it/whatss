@@ -30,21 +30,33 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
   ))
   const [radius, setRadius] = useState(value?.radius ?? 2500)
   const [address, setAddress] = useState(value?.address || '')
+  const [mapError, setMapError] = useState(null)
 
   // ── Init map once Google is ready ─────────────────────────────────────────
   useEffect(() => {
     if (!ready || !google || !mapDivRef.current || mapRef.current) return
 
-    const map = new google.maps.Map(mapDivRef.current, {
-      center: center || DEFAULT_CENTER,
-      zoom: center ? 13 : 6,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      clickableIcons: false,
-    })
-    mapRef.current = map
-    geocoderRef.current = new google.maps.Geocoder()
+    try {
+      const map = new google.maps.Map(mapDivRef.current, {
+        center: center || DEFAULT_CENTER,
+        zoom: center ? 13 : 6,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        clickableIcons: false,
+      })
+      mapRef.current = map
+      geocoderRef.current = new google.maps.Geocoder()
+      setMapError(null)
+    } catch (err) {
+      const message = (err && err.message) ? err.message : 'Google Maps failed to initialize.'
+      setMapError(
+        message.includes('ApiTargetBlockedMapError')
+          ? 'Google Maps blocked this application: check your API key restrictions and allowed referrers.'
+          : message
+      )
+      return
+    }
 
     map.addListener('click', (e) => {
       if (!e?.latLng) return
@@ -236,9 +248,14 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
         className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
         style={{ height: 380 }}
       >
-        {!ready && !error && (
+        {!ready && !error && !mapError && (
           <div className="h-full flex items-center justify-center text-xs text-gray-400">
             Loading Google Maps…
+          </div>
+        )}
+        {(error || mapError) && (
+          <div className="h-full flex items-center justify-center px-4 text-xs text-red-600 text-center">
+            {mapError || error}
           </div>
         )}
       </div>

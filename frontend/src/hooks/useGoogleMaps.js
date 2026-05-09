@@ -35,6 +35,20 @@ async function fetchMapsKey() {
   return cachedKeyPromise
 }
 
+function attachGoogleMapsAuthFailureHandler(onFailure) {
+  if (typeof window === 'undefined') return () => {}
+  const previous = window.gm_authFailure
+  const handler = () => {
+    if (typeof previous === 'function') previous()
+    if (window.gm_authFailure === handler) window.gm_authFailure = previous
+    onFailure()
+  }
+  window.gm_authFailure = handler
+  return () => {
+    if (window.gm_authFailure === handler) window.gm_authFailure = previous
+  }
+}
+
 function loadScript(key, libraries = ['places']) {
   if (typeof window === 'undefined') return Promise.reject(new Error('No window'))
   if (window.google?.maps) return Promise.resolve(window.google)
@@ -82,6 +96,11 @@ function loadScript(key, libraries = ['places']) {
         return
       }
     }
+    const restoreAuthHandler = attachGoogleMapsAuthFailureHandler(() => {
+      cachedScriptPromise = null
+      reject(new Error('Google Maps authentication failed. Check API key restrictions and referrer settings.'))
+    })
+
     const s = document.createElement('script')
     s.id = 'google-maps-js'
     s.async = true
@@ -91,13 +110,18 @@ function loadScript(key, libraries = ['places']) {
     s.onload = () => {
       s.dataset.loaded = 'true'
       waitForGoogleMaps()
-        .then(resolve)
+        .then((google) => {
+          restoreAuthHandler()
+          resolve(google)
+        })
         .catch((err) => {
+          restoreAuthHandler()
           cachedScriptPromise = null
           reject(err)
         })
     }
     s.onerror = () => {
+      restoreAuthHandler()
       cachedScriptPromise = null
       reject(new Error('Failed to load Google Maps JS'))
     }

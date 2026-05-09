@@ -11,8 +11,10 @@ const express = require('express');
 const router = express.Router();
 
 router.get('/maps-key', (req, res) => {
-  const key = process.env.GOOGLE_PLACES_API_KEY || '';
-  if (!key) return res.status(500).json({ error: 'GOOGLE_PLACES_API_KEY not configured' });
+  const key = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_PLACES_API_KEY || '';
+  if (!key) {
+    return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY or GOOGLE_PLACES_API_KEY not configured' });
+  }
   res.set('Cache-Control', 'public, max-age=300');
   return res.json({ key });
 });

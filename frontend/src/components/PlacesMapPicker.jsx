@@ -87,8 +87,8 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
           const lng = place.location.lng()
           const addr = place.formattedAddress || place.displayName || ''
           setAddress(addr)
-          if (place.viewport) map.fitBounds(place.viewport)
-          else { map.setCenter({ lat, lng }); map.setZoom(13) }
+          if (place.viewport) mapRef.current.fitBounds(place.viewport)
+          else { mapRef.current.setCenter({ lat, lng }); mapRef.current.setZoom(13) }
           placeAt(lat, lng, { address: addr, reverseGeocode: false })
         } catch (_) {
           // Ignore transient Places API failures and keep map usable.
@@ -110,8 +110,8 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
         const lng = place.geometry.location.lng()
         const addr = place.formatted_address || place.name || ''
         setAddress(addr)
-        if (place.geometry.viewport) map.fitBounds(place.geometry.viewport)
-        else { map.setCenter({ lat, lng }); map.setZoom(13) }
+        if (place.geometry.viewport) mapRef.current.fitBounds(place.geometry.viewport)
+        else { mapRef.current.setCenter({ lat, lng }); mapRef.current.setZoom(13) }
         placeAt(lat, lng, { address: addr, reverseGeocode: false })
       })
     }

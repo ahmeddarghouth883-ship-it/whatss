@@ -25,7 +25,7 @@ function waitForGoogleMaps(timeoutMs = 10000) {
 async function fetchMapsKey() {
   if (!cachedKeyPromise) {
     cachedKeyPromise = api
-      .get('/config/maps-key')
+      .get('config/maps-key')
       .then((r) => r.data?.key || '')
       .catch((err) => {
         const detail = err?.response?.data?.error || err?.message || 'Unknown error'

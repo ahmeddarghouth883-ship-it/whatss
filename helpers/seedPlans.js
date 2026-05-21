@@ -28,7 +28,7 @@ const PLANS = [
     label:     'Basic',
     blurb:     'For solo operators and small teams getting started with outreach.',
     priceUsd:  29,
-    priceTnd:  90,
+    priceTnd:  150,
     credits:   1500,
     isCustom:  false,
     oneTime:   false,
@@ -46,7 +46,7 @@ const PLANS = [
     label:     'Pro',
     blurb:     'Agencies and sales teams running daily campaigns at scale.',
     priceUsd:  79,
-    priceTnd:  245,
+    priceTnd:  360,
     credits:   6000,
     isCustom:  false,
     oneTime:   false,
@@ -98,9 +98,12 @@ async function seedPlans() {
         existing.isCustom  = p.isCustom;
         existing.oneTime   = p.oneTime;
         existing.active    = true;
-        if (existing.priceUsd == null) existing.priceUsd = p.priceUsd;
-        if (existing.priceTnd == null) existing.priceTnd = p.priceTnd;
-        if (existing.credits  == null) existing.credits  = p.credits;
+        
+        // Force sync prices and credits based on the request
+        existing.priceUsd = p.priceUsd;
+        existing.priceTnd = p.priceTnd;
+        existing.credits  = p.credits;
+
         await existing.save();
         updated++;
       }

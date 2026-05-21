@@ -158,7 +158,7 @@ async function ensureLibraries(googleObj, libraries = ['places']) {
  */
 export function useGoogleMaps(libraries = ['places']) {
   const [google, setGoogle] = useState(typeof window !== 'undefined' ? window.google || null : null)
-  const [ready, setReady]   = useState(!!(typeof window !== 'undefined' && window.google?.maps?.Map))
+  const [ready, setReady]   = useState(!!(typeof window !== 'undefined' && window.google?.maps))
   const [error, setError]   = useState(null)
 
   useEffect(() => {
@@ -171,7 +171,7 @@ export function useGoogleMaps(libraries = ['places']) {
         await ensureLibraries(g, libraries)
         if (cancelled) return
         setGoogle(g)
-        setReady(!!g?.maps?.Map)
+        setReady(true)
       } catch (e) {
         if (!cancelled) setError(e.message || 'Failed to load Google Maps')
       }

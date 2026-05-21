@@ -37,7 +37,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
     if (!ready || !google || !mapDivRef.current || mapRef.current) return
 
     try {
-      const map = new google.maps.Map(mapDivRef.current, {
+      const mapInstance = new google.maps.Map(mapDivRef.current, {
         center: center || DEFAULT_CENTER,
         zoom: center ? 13 : 6,
         mapTypeControl: false,
@@ -45,7 +45,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
         fullscreenControl: false,
         clickableIcons: false,
       })
-      mapRef.current = map
+      mapRef.current = mapInstance
       geocoderRef.current = new google.maps.Geocoder()
       setMapError(null)
     } catch (err) {
@@ -58,7 +58,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
       return
     }
 
-    map.addListener('click', (e) => {
+    mapRef.current.addListener('click', (e) => {
       if (!e?.latLng) return
       placeAt(e.latLng.lat(), e.latLng.lng(), { reverseGeocode: true })
     })
@@ -121,8 +121,8 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
   // ── Helpers ───────────────────────────────────────────────────────────────
   function placeAt(lat, lng, opts = {}) {
     const g = google || window.google
-    const map = mapRef.current
-    if (!g || !map) return
+    const mapInstance = mapRef.current
+    if (!g || !mapInstance) return
 
     const pos = { lat, lng }
     setCenter(pos)
@@ -132,7 +132,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
       if (AdvancedMarker) {
         markerRef.current = new AdvancedMarker({
           position: pos,
-          map,
+          map: mapInstance,
           gmpDraggable: true,
           title: 'Drag to adjust the zone center',
         })
@@ -144,7 +144,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
       } else {
         // Fallback for older map payloads where AdvancedMarkerElement is unavailable.
         markerRef.current = new g.maps.Marker({
-          position: pos, map, draggable: true,
+          position: pos, map: mapInstance, draggable: true,
           title: 'Drag to adjust the zone center',
         })
         markerRef.current.addListener('dragend', (e) => {
@@ -159,7 +159,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
 
     if (!circleRef.current) {
       circleRef.current = new g.maps.Circle({
-        map, center: pos, radius,
+        map: mapInstance, center: pos, radius,
         editable: true, draggable: true, clickable: false,
         strokeColor: '#22c55e', strokeWeight: 2, strokeOpacity: 0.9,
         fillColor: '#22c55e', fillOpacity: 0.12,

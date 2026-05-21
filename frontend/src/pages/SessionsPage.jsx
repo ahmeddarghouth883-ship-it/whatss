@@ -4,14 +4,14 @@ import api from '../api/client'
 import { useSocket } from '../hooks/useSocket'
 
 function StatusDot({ status }) {
-  const map = {
+  const statusMap = {
     ready:       'bg-green-500',
     connecting:  'bg-yellow-400 animate-pulse',
     qr:          'bg-blue-400 animate-pulse',
     disconnected:'bg-gray-300',
     banned:      'bg-red-500'
   }
-  return <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${map[status] || 'bg-gray-300'}`} />
+  return <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusMap[status] || 'bg-gray-300'}`} />
 }
 
 export default function SessionsPage() {

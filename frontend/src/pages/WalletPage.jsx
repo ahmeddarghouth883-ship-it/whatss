@@ -21,14 +21,14 @@ function fmtDate(d) {
 }
 
 function StatusBadge({ status }) {
-  const map = {
+  const statusMap = {
     pending:   'bg-amber-100 text-amber-800',
     approved:  'bg-green-100 text-green-700',
     rejected:  'bg-red-100 text-red-700',
     cancelled: 'bg-gray-100 text-gray-600',
   }
   return (
-    <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${map[status] || 'bg-gray-100 text-gray-600'}`}>
+    <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${statusMap[status] || 'bg-gray-100 text-gray-600'}`}>
       {status}
     </span>
   )

@@ -5,8 +5,8 @@ import api from '../api/client'
 import FileUploader from '../components/FileUploader'
 
 function StatusBadge({ status }) {
-  const map = { draft:'badge-gray', running:'badge-blue', paused:'badge-yellow', done:'badge-green', failed:'badge-red' }
-  return <span className={map[status] || 'badge-gray'}>{status}</span>
+  const statusMap = { draft:'badge-gray', running:'badge-blue', paused:'badge-yellow', done:'badge-green', failed:'badge-red' }
+  return <span className={statusMap[status] || 'badge-gray'}>{status}</span>
 }
 
 // ── Variable helper chips ─────────────────────────────────────────────────────

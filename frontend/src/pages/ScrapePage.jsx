@@ -17,8 +17,8 @@ const DEFAULT_MAX_LEADS  = 200
 const MAX_LEAD_PRESETS   = [60, 200, 500]
 
 function StatusBadge({ status }) {
-  const map = { pending:'badge-yellow', running:'badge-blue', done:'badge-green', failed:'badge-red', cancel_requested:'badge-yellow', cancelled:'badge-gray' }
-  return <span className={map[status] || 'badge-gray'}>{status}</span>
+  const statusMap = { pending:'badge-yellow', running:'badge-blue', done:'badge-green', failed:'badge-red', cancel_requested:'badge-yellow', cancelled:'badge-gray' }
+  return <span className={statusMap[status] || 'badge-gray'}>{status}</span>
 }
 
 function formatTimelineClock(value) {

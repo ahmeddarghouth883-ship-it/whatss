@@ -40,6 +40,7 @@ export default function PlacesMapPicker({ value, onChange, className = '' }) {
       const mapInstance = new google.maps.Map(mapDivRef.current, {
         center: center || DEFAULT_CENTER,
         zoom: center ? 13 : 6,
+        mapId: 'DEMO_MAP_ID',
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
